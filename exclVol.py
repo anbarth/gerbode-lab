@@ -19,11 +19,14 @@ import random
 
 #fname = 'annasNewCrystal.csv'
 #fname = 'annasNewCrystalRandom.csv'
-fname = 'small2.csv'
+#fname = 'small.csv'
+fname = 'nearestNeighbors.csv'
+i_center = 12
+i_neighbors = [6,7,11,13,16,17]
 xmin = 0
 ymin = 0
 beadRad = 4
-gridSize = [30,40] #small
+#gridSize = [30,40] #small
 #gridSize = [52,64] #annasNewCrystal
 
 particleCenters = []
@@ -31,9 +34,12 @@ occupiedPx = []
 anna = []
 
 
-def populateGridRandomly(numBeads):
+def populateGridRandomly(numBeads,gridX,gridY):
     global particleCenters
     global occupiedPx
+
+    global gridSize 
+    gridSize = [gridX,gridY]
 
     i = 0
     tic = time.time()
@@ -53,6 +59,7 @@ def populateGridRandomly(numBeads):
 def saveGrid(fname):
     with open(fname,'w',newline='') as csvFile:
         writer = csv.writer(csvFile,delimiter=',')
+        writer.writerow([gridSize[0],gridSize[1]])
         for (x,y) in particleCenters:        
             writer.writerow([x,y])
 
@@ -92,15 +99,22 @@ def pxOccupiedByParticle(p):
 
 def populateGrid():
     global occupiedPx # necessary bc i have a line of the form "occupiedPx = ..." in this function
+    global gridSize
 
     #print('reading in the centers...')
     with open(fname) as csvFile:
         reader = csv.reader(csvFile, delimiter=',')
+        first = True
         for row in reader:
+            if first:
+                gridSize = [int(row[0]),int(row[1])]
+                first = False
+                continue
             # TODO dont hardcode the offset values here
             particleCenters.append((int(float(row[0])),int(float(row[1])))) #normal
             #particleCenters.append(  (int(float(row[0]))-xmin, gridSize[0]-(int(float(row[1]))-ymin))  ) #myParts
             #particleCenters.append(  (int(float(row[0]))-150, gridSize[0]-(int(float(row[1]))-350))  ) #myPartsOrderly
+
 
     #print('filling in occupied px...')
     for (x0,y0) in particleCenters:
@@ -114,8 +128,12 @@ def showGrid():
         circ = plt.Circle((x, y), beadRad, color='gray', alpha=0.3)
         ax.add_artist(circ)
 
-    #circ = plt.Circle(particleCenters[6], beadRad, color='black', alpha=0.5)
-    #ax.add_artist(circ)
+    circ = plt.Circle(particleCenters[i_center], beadRad, color='purple', alpha=0.5)
+    ax.add_artist(circ)
+
+    for x in i_neighbors:
+        circ = plt.Circle(particleCenters[x], beadRad, color='green', alpha=0.5)
+        ax.add_artist(circ)
 
     plt.scatter(*zip(*occupiedPx),marker='.')
     plt.xlim(0,gridSize[0])
@@ -204,21 +222,6 @@ def entropy():
     print('time: '+str(toc-tic))
     return S
 
-def fakeEntropy():
-    tic = time.time()
-    S = 0
-    n = 0
-    for p in particleCenters:
-        #print(n)
-        n += 1
-        space = freeSpace(p)
-        V = len(space)
-        #particleVol = len(pxOccupiedByParticle(p))
-        S += V
-        #S += np.log(V)
-    toc = time.time()
-    print('time: '+str(toc-tic))
-    return S
 
 def volumeFraction():
     return len(occupiedPx) / gridSize[0] / gridSize[1]
@@ -228,7 +231,6 @@ populateGrid()
 #print(len(particleCenters))
 #print(volumeFraction())
 #print(len(pxOccupiedByParticle(particleCenters[152])))
-print(fakeEntropy())
 
 showGrid()
 #saveGrid('test.csv')
