@@ -20,14 +20,14 @@ import random
 #fname = 'annasNewCrystal.csv'
 #fname = 'annasNewCrystalRandom.csv'
 #fname = 'small.csv'
-fname = 'nearestNeighbors.csv'
+#fname = 'empty.csv'
+fname = 'nearestNeighborsHard.csv'
 i_center = 12
 i_neighbors = [6,7,11,13,16,17]
 xmin = 0
 ymin = 0
 beadRad = 4
-#gridSize = [30,40] #small
-#gridSize = [52,64] #annasNewCrystal
+
 
 particleCenters = []
 occupiedPx = []
@@ -97,6 +97,8 @@ def pxOccupiedByParticle(p):
 
     return occupied
 
+
+
 def populateGrid():
     global occupiedPx # necessary bc i have a line of the form "occupiedPx = ..." in this function
     global gridSize
@@ -128,20 +130,58 @@ def showGrid():
         circ = plt.Circle((x, y), beadRad, color='gray', alpha=0.3)
         ax.add_artist(circ)
 
-    circ = plt.Circle(particleCenters[i_center], beadRad, color='purple', alpha=0.5)
+    '''circ = plt.Circle(particleCenters[i_center], beadRad, color='purple', alpha=0.5)
     ax.add_artist(circ)
 
     for x in i_neighbors:
         circ = plt.Circle(particleCenters[x], beadRad, color='green', alpha=0.5)
-        ax.add_artist(circ)
+        ax.add_artist(circ)'''
 
     plt.scatter(*zip(*occupiedPx),marker='.')
     plt.xlim(0,gridSize[0])
     plt.ylim(0,gridSize[1])
-    #plt.xticks(np.arange(0, gridSize, step=10))
-    #plt.yticks(np.arange(0, gridSize, step=10))
-    #plt.grid(b=True,which='both',axis='both')
+    plt.xticks(np.arange(0, gridSize[0], step=1))
+    plt.yticks(np.arange(0, gridSize[1], step=1))
+    plt.grid(b=True,which='both',axis='both')
     plt.show()
+
+
+def pxExcludedByParticle(p):
+
+    # px excluded by p are all the positions that conflict with a bead at p
+
+    # get all the spots occupied by a bead at p
+    # sort that shit bc we're gonna be searching it a LOT
+    pxList = sorted(pxOccupiedByParticle(p))
+
+    # get ready to check for excluded positions, starting at the center p
+    pxToCheck = [p]
+    excluded = []
+
+    for (x,y) in pxToCheck:
+        if conflict((x,y),pxList):
+            excluded.append((x,y))
+            neighbors = getNeighbors((x,y))
+            for neighbor in neighbors:
+                if neighbor not in pxToCheck:
+                    pxToCheck.append(neighbor)
+
+
+    return excluded
+
+# TODO isAvailable is just this but with pxList=occupiedPx
+# p=(x0,y0) is a test position. does it conflict with the positions in pxList?
+def conflict(p,pxList):
+    (x0,y0) = p
+    # pretend to put a bead at (x0,y0)
+    dangerZone = pxOccupiedByParticle((x0,y0))
+    # now see if any of the positions occupied by the bead are in pxList
+    for (x,y) in dangerZone:
+        index = bisect.bisect_left(pxList,(x,y))
+        if index != len(pxList) and pxList[index] == (x,y):
+        #if (x,y) in pxList:
+            return True
+    return False
 
 def isAvailable(p):
     (x0,y0) = p
@@ -204,6 +244,32 @@ def showFreeSpace(particleCenter):
     plt.scatter(*zip(*occupiedPx),marker='.')
     plt.scatter(*zip(*freePx),marker='.',color='red')
 
+    plt.xlim(0,gridSize[0])
+    plt.ylim(0,gridSize[1])
+    plt.xticks(np.arange(0, gridSize[0], step=1))
+    plt.yticks(np.arange(0, gridSize[1], step=1))
+    plt.grid(b=True,which='both',axis='both')
+
+    plt.show()
+
+def showExclSpace(particleCenter):
+    exclPx = pxExcludedByParticle(particleCenter)
+
+    # lots of copied-pasted from showGrid lol
+    fig, ax = plt.subplots()
+    for (x,y) in particleCenters:
+        circ = plt.Circle((x, y), beadRad, color='gray', alpha=0.3)
+        ax.add_artist(circ)
+
+    plt.scatter(*zip(*occupiedPx),marker='.')
+    plt.scatter(*zip(*exclPx),marker='.',color='red')
+
+    plt.xlim(0,gridSize[0])
+    plt.ylim(0,gridSize[1])
+    plt.xticks(np.arange(0, gridSize[0], step=1))
+    plt.yticks(np.arange(0, gridSize[1], step=1))
+    plt.grid(b=True,which='both',axis='both')
+
     plt.show()
 
 def entropy():
@@ -222,6 +288,23 @@ def entropy():
     print('time: '+str(toc-tic))
     return S
 
+# counts possible configurations of particles in i_neighbors, the lazy way (ie treat each neighbor as if its independent of the others)
+# returns ln(total # configs)
+def neighborConfigs():
+    tic = time.time()
+    ln_configs = 0
+
+    for i in i_neighbors:
+        p = particleCenters[i]
+        space = freeSpace(p)
+        V = len(space)
+        ln_configs += np.log(V)
+    toc = time.time()
+    print('time: '+str(toc-tic))
+    return ln_configs
+    
+#def neighborConfigsHard():
+
 
 def volumeFraction():
     return len(occupiedPx) / gridSize[0] / gridSize[1]
@@ -231,10 +314,14 @@ populateGrid()
 #print(len(particleCenters))
 #print(volumeFraction())
 #print(len(pxOccupiedByParticle(particleCenters[152])))
+#print(neighborConfigs())
 
 showGrid()
+showExclSpace((21,24))
+#pxList = pxOccupiedByParticle((21,24))
+#print(conflict((16,24),pxList))
 #saveGrid('test.csv')
-#showFreeSpace(particleCenters[0])
+#showFreeSpace((12,30))
 '''i = 100
 while i < 103:
     print(i)
