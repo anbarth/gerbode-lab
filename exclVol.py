@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import time
 import bisect
 import random
+import operator
 
 #fname = 'myPartsOrderly.csv'
 #xmin = 150
@@ -31,7 +32,9 @@ beadRad = 4
 
 particleCenters = []
 occupiedPx = []
-anna = []
+
+exclShape = []
+occShape = []
 
 
 def populateGridRandomly(numBeads,gridX,gridY):
@@ -82,27 +85,11 @@ def getNeighbors(p):
         neighbors.append((x,y+1))
     return neighbors
 
-def pxOccupiedByParticle(p):
-    (x0,y0) = p
-    pxToCheck = [(x0,y0)]
-    occupied = []
-
-    for (x,y) in pxToCheck:
-        if dist((x0,y0),(x,y)) <= beadRad:
-            occupied.append((x,y))
-            neighbors = getNeighbors((x,y))
-            for neighbor in neighbors:
-                if neighbor not in pxToCheck:
-                    pxToCheck.append(neighbor)
-
-    return occupied
-
-
-
 def populateGrid():
     global occupiedPx # necessary bc i have a line of the form "occupiedPx = ..." in this function
     global gridSize
 
+    
     #print('reading in the centers...')
     with open(fname) as csvFile:
         reader = csv.reader(csvFile, delimiter=',')
@@ -117,6 +104,8 @@ def populateGrid():
             #particleCenters.append(  (int(float(row[0]))-xmin, gridSize[0]-(int(float(row[1]))-ymin))  ) #myParts
             #particleCenters.append(  (int(float(row[0]))-150, gridSize[0]-(int(float(row[1]))-350))  ) #myPartsOrderly
 
+    setOccShape()
+    setExclShape()
 
     #print('filling in occupied px...')
     for (x0,y0) in particleCenters:
@@ -124,6 +113,8 @@ def populateGrid():
     occupiedPx = sorted(occupiedPx)
 
 
+    
+    
 def showGrid():
     fig, ax = plt.subplots()
     for (x,y) in particleCenters:
@@ -140,10 +131,62 @@ def showGrid():
     plt.scatter(*zip(*occupiedPx),marker='.')
     plt.xlim(0,gridSize[0])
     plt.ylim(0,gridSize[1])
-    plt.xticks(np.arange(0, gridSize[0], step=1))
-    plt.yticks(np.arange(0, gridSize[1], step=1))
-    plt.grid(b=True,which='both',axis='both')
+    #plt.xticks(np.arange(0, gridSize[0], step=1))
+    #plt.yticks(np.arange(0, gridSize[1], step=1))
+    #plt.grid(b=True,which='both',axis='both')
     plt.show()
+
+# returns the shape of a generic excluded volume
+# requires a seed position x0,y0 that's far from the edges
+# i've chosen the center of the grid
+# returns as a list
+# to get the excluded volume for a bead centered at (x,y), add (x,y) to every element of the list
+# TODO is it a problem that that ^ gives you positions that aren't actually on the grid??
+def setExclShape():
+    global exclShape
+
+    x0 = int(gridSize[0]/2)
+    y0 = int(gridSize[1]/2)
+    # px excluded by p are all the positions that conflict with a bead at p
+    # get all the spots occupied by a bead at p
+    # sort that shit bc we're gonna be searching it a LOT
+    pxList = sorted(pxOccupiedByParticle((x0,y0)))
+
+    # get ready to check for excluded positions, starting at the center p
+    pxToCheck = [(x0,y0)]
+    excluded = []
+
+    for (x,y) in pxToCheck:
+        if conflict((x,y),pxList):
+            excluded.append((x-x0,y-y0))
+            neighbors = getNeighbors((x,y))
+            for neighbor in neighbors:
+                if neighbor not in pxToCheck:
+                    pxToCheck.append(neighbor)
+
+    exclShape = excluded
+    return excluded
+
+
+def setOccShape():
+    global occShape
+
+    x0 = int(gridSize[0]/2)
+    y0 = int(gridSize[1]/2)
+
+    pxToCheck = [(x0,y0)]
+    occupied = []
+
+    for (x,y) in pxToCheck:
+        if dist((x0,y0),(x,y)) <= beadRad:
+            occupied.append((x-x0,y-y0))
+            neighbors = getNeighbors((x,y))
+            for neighbor in neighbors:
+                if neighbor not in pxToCheck:
+                    pxToCheck.append(neighbor)
+
+    occShape = occupied
+    return occupied
 
 
 def pxExcludedByParticle(p):
@@ -168,6 +211,32 @@ def pxExcludedByParticle(p):
 
 
     return excluded
+
+def pxOccupiedByParticleNew(p):
+    #return [tuple(map(operator.add, p,x)) for x in occShape]
+    pxOcc = []
+    for (x,y) in occShape:
+        xpos = x+p[0]
+        ypos = y+p[1]
+        if xpos >= 0 and xpos < gridSize[0] and ypos >= 0 and ypos < gridSize[1]:
+            pxOcc.append((xpos,ypos))
+    return pxOcc
+
+
+def pxOccupiedByParticle(p):
+    (x0,y0) = p
+    pxToCheck = [(x0,y0)]
+    occupied = []
+
+    for (x,y) in pxToCheck:
+        if dist((x0,y0),(x,y)) <= beadRad:
+            occupied.append((x,y))
+            neighbors = getNeighbors((x,y))
+            for neighbor in neighbors:
+                if neighbor not in pxToCheck:
+                    pxToCheck.append(neighbor)
+
+    return occupied
 
 # TODO isAvailable is just this but with pxList=occupiedPx
 # p=(x0,y0) is a test position. does it conflict with the positions in pxList?
@@ -246,14 +315,16 @@ def showFreeSpace(particleCenter):
 
     plt.xlim(0,gridSize[0])
     plt.ylim(0,gridSize[1])
-    plt.xticks(np.arange(0, gridSize[0], step=1))
-    plt.yticks(np.arange(0, gridSize[1], step=1))
-    plt.grid(b=True,which='both',axis='both')
+    #plt.xticks(np.arange(0, gridSize[0], step=1))
+    #plt.yticks(np.arange(0, gridSize[1], step=1))
+    #plt.grid(b=True,which='both',axis='both')
 
     plt.show()
 
+
 def showExclSpace(particleCenter):
-    exclPx = pxExcludedByParticle(particleCenter)
+    #shadow = exclShape()
+    exclPx = [tuple(map(operator.add, particleCenter,x)) for x in exclShape]
 
     # lots of copied-pasted from showGrid lol
     fig, ax = plt.subplots()
@@ -266,9 +337,9 @@ def showExclSpace(particleCenter):
 
     plt.xlim(0,gridSize[0])
     plt.ylim(0,gridSize[1])
-    plt.xticks(np.arange(0, gridSize[0], step=1))
-    plt.yticks(np.arange(0, gridSize[1], step=1))
-    plt.grid(b=True,which='both',axis='both')
+    #plt.xticks(np.arange(0, gridSize[0], step=1))
+    #plt.yticks(np.arange(0, gridSize[1], step=1))
+    #plt.grid(b=True,which='both',axis='both')
 
     plt.show()
 
@@ -302,8 +373,30 @@ def neighborConfigs():
     toc = time.time()
     print('time: '+str(toc-tic))
     return ln_configs
+
+# TODO i am assuming freePx is sorted
+def numConfigs(numBeads,freePx):
+    if numBeads == 1:
+        return len(freePx)
     
-#def neighborConfigsHard():
+    configs = 0
+    n = 0
+    for p in freePx:
+        #print(n)
+        # consider all the freePx... except the ones that have been already touched by this bead
+        newFreePx = freePx[n:]
+        # remove all the newly excluded positions from newFreePx
+        exclPx = [tuple(map(operator.add, p,x)) for x in exclShape]
+        #exclPx = pxExcludedByParticle(p)
+        for q in exclPx:
+            index = bisect.bisect_left(newFreePx, q)
+            if index != len(newFreePx) and newFreePx[index] == q:
+                del newFreePx[index]
+
+        configs += numConfigs(numBeads-1,newFreePx)
+        n += 1
+
+    return configs
 
 
 def volumeFraction():
@@ -316,12 +409,18 @@ populateGrid()
 #print(len(pxOccupiedByParticle(particleCenters[152])))
 #print(neighborConfigs())
 
-showGrid()
-showExclSpace((21,24))
+#showGrid()
+#showFreeSpace(particleCenters[5])
 #pxList = pxOccupiedByParticle((21,24))
 #print(conflict((16,24),pxList))
 #saveGrid('test.csv')
-#showFreeSpace((12,30))
+#showFreeSpace((21,14))
+#showFreeSpace((21,32))
+
+totFreeSpace = sorted( freeSpace((21,14)) + freeSpace((21,32)) )
+tic = time.time()
+print(numConfigs(3,totFreeSpace))
+print('time: '+str(time.time()-tic))
 '''i = 100
 while i < 103:
     print(i)
