@@ -22,12 +22,13 @@ import operator
 #fname = 'annasNewCrystalRandom.csv'
 #fname = 'small.csv'
 #fname = 'empty.csv'
-fname = 'nearestNeighborsHard.csv'
+#fname = 'nearestNeighborsHard.csv'
+fname = 'testForNearestNeighbors.csv'
 i_center = 12
 i_neighbors = [6,7,11,13,16,17]
 xmin = 0
 ymin = 0
-beadRad = 4
+beadRad = 0
 
 
 particleCenters = []
@@ -277,24 +278,15 @@ def freeSpace(particleCenter):
     tic = time.time()
     particle = pxOccupiedByParticle(particleCenter) # particle includes all (x,y) to ignore
     freePx = []
-    pxToCheck = particle
-
-    #n = 0
+    pxToCheck = particle[:] # make a COPY!!!!
     for (x,y) in pxToCheck:
-        #n += 1
-        #if n > 500:
-        #    break
-        #print('----------------------')
-        #print((x,y))
         if isAvailableIgnore((x,y),particle):
-            #print('available')
             freePx.append((x,y))
             neighbors = getNeighbors((x,y))
-            #print(neighbors)
             for neighbor in neighbors:
                 if neighbor not in pxToCheck:
                     pxToCheck.append(neighbor)
-        #print(pxToCheck)
+
     
     toc = time.time()
     #print("time: "+str(toc-tic))
@@ -409,7 +401,9 @@ populateGrid()
 #print(len(pxOccupiedByParticle(particleCenters[152])))
 #print(neighborConfigs())
 
-#showGrid()
+showGrid()
+#print(pxExcludedByParticle((2,2)))
+showFreeSpace((2,2))
 #showFreeSpace(particleCenters[5])
 #pxList = pxOccupiedByParticle((21,24))
 #print(conflict((16,24),pxList))
@@ -417,10 +411,13 @@ populateGrid()
 #showFreeSpace((21,14))
 #showFreeSpace((21,32))
 
-totFreeSpace = sorted( freeSpace((21,14)) + freeSpace((21,32)) )
-tic = time.time()
-print(numConfigs(3,totFreeSpace))
-print('time: '+str(time.time()-tic))
+#totFreeSpace = sorted( freeSpace((21,14)) + freeSpace((21,32)) )
+#tic = time.time()
+#print(numConfigs(3,totFreeSpace))
+#print('time: '+str(time.time()-tic))
+
+
+
 '''i = 100
 while i < 103:
     print(i)
