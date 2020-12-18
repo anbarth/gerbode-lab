@@ -23,12 +23,12 @@ import operator
 #fname = 'small.csv'
 #fname = 'empty.csv'
 #fname = 'nearestNeighborsHard.csv'
-fname = 'testForNearestNeighbors.csv'
+fname = 'testForNearestNeighbors2.csv'
 i_center = 12
 i_neighbors = [6,7,11,13,16,17]
 xmin = 0
 ymin = 0
-beadRad = 0
+beadRad = 1
 
 
 particleCenters = []
@@ -264,8 +264,10 @@ def isAvailable(p):
     return True
 
 def isAvailableIgnore(p,particle):
+
     (x0,y0) = p
     dangerZone = pxOccupiedByParticle((x0,y0))
+
     for (x,y) in dangerZone:
         #if (x,y) in occupiedPx and (x,y) not in particle:
         if (x,y) not in particle:
@@ -401,16 +403,23 @@ populateGrid()
 #print(len(pxOccupiedByParticle(particleCenters[152])))
 #print(neighborConfigs())
 
-showGrid()
-#print(pxExcludedByParticle((2,2)))
-showFreeSpace((2,2))
-#showFreeSpace(particleCenters[5])
-#pxList = pxOccupiedByParticle((21,24))
-#print(conflict((16,24),pxList))
-#saveGrid('test.csv')
-#showFreeSpace((21,14))
-#showFreeSpace((21,32))
+#showGrid()
+#showFreeSpace((4,4))
 
+# this is for testForNearestNeighbors2
+totFreeSpace = sorted( freeSpace((4,4)) )
+tic = time.time()
+print(numConfigs(3,totFreeSpace))
+print('time: '+str(time.time()-tic))
+
+# this is for testForNearestNeighbors
+#totFreeSpace = sorted( freeSpace((2,2)) )
+#tic = time.time()
+#print(numConfigs(6,totFreeSpace))
+#print('time: '+str(time.time()-tic))
+
+
+# this is for nearestNeighborsHard
 #totFreeSpace = sorted( freeSpace((21,14)) + freeSpace((21,32)) )
 #tic = time.time()
 #print(numConfigs(3,totFreeSpace))
