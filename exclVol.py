@@ -14,21 +14,27 @@ import operator
 #xmin = 550
 #ymin = 350
 
+fname = 'readshock4_15.csv'
+#fname = 'pi24_diam11_frame6.csv'
+xmin = 800
+ymin = 250
+beadRad = 5
+
 #beadRad = 8
 # grid of pixels includes 0, excludes gridSize
 #gridSize = [350,300]
 
-#fname = 'annasNewCrystal.csv'
+#fname = 'annasNewCrystal_hacked.csv'
 #fname = 'annasNewCrystalRandom.csv'
 #fname = 'small.csv'
 #fname = 'empty.csv'
 #fname = 'nearestNeighborsHard.csv'
-fname = 'testForNearestNeighbors2.csv'
+#fname = 'testForNearestNeighbors2.csv'
 i_center = 12
 i_neighbors = [6,7,11,13,16,17]
-xmin = 0
-ymin = 0
-beadRad = 1
+#xmin = 0
+#ymin = 0
+#beadRad = 4
 
 
 particleCenters = []
@@ -67,7 +73,6 @@ def saveGrid(fname):
         for (x,y) in particleCenters:        
             writer.writerow([x,y])
 
-
 def dist(p1,p2):
     (x1,y1) = p1
     (x2,y2) = p2
@@ -76,6 +81,7 @@ def dist(p1,p2):
 def getNeighbors(p):
     (x,y) = p
     neighbors = []
+    # remember: we include 0 and exclude gridSize
     if x > 0:
         neighbors.append((x-1,y))
     if y > 0:
@@ -88,9 +94,8 @@ def getNeighbors(p):
 
 def populateGrid():
     global occupiedPx # necessary bc i have a line of the form "occupiedPx = ..." in this function
-    global gridSize
+    global gridSize # likewise, there's a line of the form "gridSize = ..."
 
-    
     #print('reading in the centers...')
     with open(fname) as csvFile:
         reader = csv.reader(csvFile, delimiter=',')
@@ -101,7 +106,8 @@ def populateGrid():
                 first = False
                 continue
             # TODO dont hardcode the offset values here
-            particleCenters.append((int(float(row[0])),int(float(row[1])))) #normal
+            #particleCenters.append((int(float(row[0])),int(float(row[1])))) #normal
+            particleCenters.append(  (int( float(row[0]) )-xmin-5, int( float(row[1]) )-ymin-5)  ) 
             #particleCenters.append(  (int(float(row[0]))-xmin, gridSize[0]-(int(float(row[1]))-ymin))  ) #myParts
             #particleCenters.append(  (int(float(row[0]))-150, gridSize[0]-(int(float(row[1]))-350))  ) #myPartsOrderly
 
@@ -213,7 +219,7 @@ def pxExcludedByParticle(p):
 
     return excluded
 
-def pxOccupiedByParticleNew(p):
+def pxOccupiedByParticle(p):
     #return [tuple(map(operator.add, p,x)) for x in occShape]
     pxOcc = []
     for (x,y) in occShape:
@@ -224,7 +230,7 @@ def pxOccupiedByParticleNew(p):
     return pxOcc
 
 
-def pxOccupiedByParticle(p):
+def pxOccupiedByParticleOld(p):
     (x0,y0) = p
     pxToCheck = [(x0,y0)]
     occupied = []
@@ -253,6 +259,7 @@ def conflict(p,pxList):
             return True
     return False
 
+# TODO offgrid positions are not available
 def isAvailable(p):
     (x0,y0) = p
     dangerZone = pxOccupiedByParticle((x0,y0))
@@ -263,6 +270,7 @@ def isAvailable(p):
             return False
     return True
 
+# TODO offgrid positions are not available
 def isAvailableIgnore(p,particle):
 
     (x0,y0) = p
@@ -307,8 +315,8 @@ def showFreeSpace(particleCenter):
     plt.scatter(*zip(*occupiedPx),marker='.')
     plt.scatter(*zip(*freePx),marker='.',color='red')
 
-    plt.xlim(0,gridSize[0])
-    plt.ylim(0,gridSize[1])
+    plt.xlim(-3,gridSize[0]+6)
+    plt.ylim(-3,gridSize[1]+6)
     #plt.xticks(np.arange(0, gridSize[0], step=1))
     #plt.yticks(np.arange(0, gridSize[1], step=1))
     #plt.grid(b=True,which='both',axis='both')
@@ -343,6 +351,10 @@ def entropy():
     n = 0
     for p in particleCenters:
         #print(n)
+        # don't count particles that are offgrid
+        # TODO could also just check if len(pxOcc) == 0, is that more elegant?
+        if p[0] < 0 or p[0] >= gridSize[0] or p[1] < 0 or p[1] >= gridSize[1]:
+            continue
         n += 1
         space = freeSpace(p)
         V = len(space)
@@ -351,6 +363,7 @@ def entropy():
         #S += np.log(V)
     toc = time.time()
     print('time: '+str(toc-tic))
+    print('entropy: '+str(S))
     return S
 
 # counts possible configurations of particles in i_neighbors, the lazy way (ie treat each neighbor as if its independent of the others)
@@ -397,20 +410,23 @@ def volumeFraction():
     return len(occupiedPx) / gridSize[0] / gridSize[1]
 
 populateGrid()
+print(len(particleCenters))
+print(volumeFraction())
+#entropy()
+showGrid()
+#showFreeSpace((171,154))
 #populateGridRandomly(36)
-#print(len(particleCenters))
-#print(volumeFraction())
-#print(len(pxOccupiedByParticle(particleCenters[152])))
 #print(neighborConfigs())
 
 #showGrid()
+#print(particleCenters)
 #showFreeSpace((4,4))
 
 # this is for testForNearestNeighbors2
-totFreeSpace = sorted( freeSpace((4,4)) )
-tic = time.time()
-print(numConfigs(3,totFreeSpace))
-print('time: '+str(time.time()-tic))
+#totFreeSpace = sorted( freeSpace((4,4)) )
+#tic = time.time()
+#print(numConfigs(3,totFreeSpace))
+#print('time: '+str(time.time()-tic))
 
 # this is for testForNearestNeighbors
 #totFreeSpace = sorted( freeSpace((2,2)) )
