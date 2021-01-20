@@ -14,26 +14,26 @@ import operator
 #xmin = 550
 #ymin = 350
 
-fname = 'readshock4_15.csv'
+#fname = 'readshock4_15.csv'
 #fname = 'pi24_diam11_frame6.csv'
-xmin = 800
-ymin = 250
-beadRad = 5
+#xmin = 800
+#ymin = 250
+
 
 #beadRad = 8
 # grid of pixels includes 0, excludes gridSize
 #gridSize = [350,300]
 
 #fname = 'annasNewCrystal_hacked.csv'
-#fname = 'annasNewCrystalRandom.csv'
+fname = 'annasNewCrystal.csv'
 #fname = 'small.csv'
 #fname = 'empty.csv'
-#fname = 'nearestNeighborsHard.csv'
-#fname = 'testForNearestNeighbors2.csv'
+#fname = 'nearestNeighbors.csv'
+#fname = 'testForNearestNeighbors.csv'
 i_center = 12
 i_neighbors = [6,7,11,13,16,17]
-#xmin = 0
-#ymin = 0
+xmin = 0
+ymin = 0
 #beadRad = 4
 
 
@@ -47,8 +47,8 @@ occShape = []
 def populateGridRandomly(numBeads,gridX,gridY):
     global particleCenters
     global occupiedPx
-
     global gridSize 
+
     gridSize = [gridX,gridY]
 
     i = 0
@@ -69,7 +69,7 @@ def populateGridRandomly(numBeads,gridX,gridY):
 def saveGrid(fname):
     with open(fname,'w',newline='') as csvFile:
         writer = csv.writer(csvFile,delimiter=',')
-        writer.writerow([gridSize[0],gridSize[1]])
+        writer.writerow([gridSize[0],gridSize[1],beadRad])
         for (x,y) in particleCenters:        
             writer.writerow([x,y])
 
@@ -95,6 +95,7 @@ def getNeighbors(p):
 def populateGrid():
     global occupiedPx # necessary bc i have a line of the form "occupiedPx = ..." in this function
     global gridSize # likewise, there's a line of the form "gridSize = ..."
+    global beadRad
 
     #print('reading in the centers...')
     with open(fname) as csvFile:
@@ -103,11 +104,12 @@ def populateGrid():
         for row in reader:
             if first:
                 gridSize = [int(row[0]),int(row[1])]
+                beadRad = int(row[2])
                 first = False
                 continue
             # TODO dont hardcode the offset values here
             #particleCenters.append((int(float(row[0])),int(float(row[1])))) #normal
-            particleCenters.append(  (int( float(row[0]) )-xmin-5, int( float(row[1]) )-ymin-5)  ) 
+            particleCenters.append(  (int( float(row[0]) )-xmin, int( float(row[1]) )-ymin)  ) 
             #particleCenters.append(  (int(float(row[0]))-xmin, gridSize[0]-(int(float(row[1]))-ymin))  ) #myParts
             #particleCenters.append(  (int(float(row[0]))-150, gridSize[0]-(int(float(row[1]))-350))  ) #myPartsOrderly
 
@@ -410,8 +412,8 @@ def volumeFraction():
     return len(occupiedPx) / gridSize[0] / gridSize[1]
 
 populateGrid()
-print(len(particleCenters))
-print(volumeFraction())
+#print(len(particleCenters))
+#print(volumeFraction())
 #entropy()
 showGrid()
 #showFreeSpace((171,154))
