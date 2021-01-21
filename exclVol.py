@@ -19,22 +19,16 @@ import operator
 #xmin = 800
 #ymin = 250
 
+fname = 'annasNewCrystalRandom.csv'
 
-#beadRad = 8
 # grid of pixels includes 0, excludes gridSize
 #gridSize = [350,300]
 
-#fname = 'annasNewCrystal_hacked.csv'
-fname = 'annasNewCrystal.csv'
-#fname = 'small.csv'
-#fname = 'empty.csv'
-#fname = 'nearestNeighbors.csv'
-#fname = 'testForNearestNeighbors.csv'
+
 i_center = 12
 i_neighbors = [6,7,11,13,16,17]
 xmin = 0
 ymin = 0
-#beadRad = 4
 
 
 particleCenters = []
@@ -43,6 +37,7 @@ occupiedPx = []
 exclShape = []
 occShape = []
 
+resolution = 4/3
 
 def populateGridRandomly(numBeads,gridX,gridY):
     global particleCenters
@@ -103,13 +98,13 @@ def populateGrid():
         first = True
         for row in reader:
             if first:
-                gridSize = [int(row[0]),int(row[1])]
-                beadRad = int(row[2])
+                gridSize = [round( int(row[0])*resolution ),round( int(row[1])*resolution )]
+                beadRad = round( int(row[2])*resolution )
                 first = False
                 continue
             # TODO dont hardcode the offset values here
             #particleCenters.append((int(float(row[0])),int(float(row[1])))) #normal
-            particleCenters.append(  (int( float(row[0]) )-xmin, int( float(row[1]) )-ymin)  ) 
+            particleCenters.append(  (round( (float(row[0])-xmin)*resolution ), round( float(row[1])-ymin)*resolution )  ) 
             #particleCenters.append(  (int(float(row[0]))-xmin, gridSize[0]-(int(float(row[1]))-ymin))  ) #myParts
             #particleCenters.append(  (int(float(row[0]))-150, gridSize[0]-(int(float(row[1]))-350))  ) #myPartsOrderly
 
