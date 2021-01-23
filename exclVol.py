@@ -7,8 +7,8 @@ import random
 import operator
 
 #fname = 'myPartsOrderly.csv'
-fname = 'myParts.csv'
-#fname = 'readshock4_15.csv'
+fname = 'myPartsFat.csv'
+#fname = 'readshock/readshock4_15.csv'
 #fname = 'pi24_diam11_frame6.csv'
 
 
@@ -22,7 +22,7 @@ exclShape = []
 occShape = []
 
 # TODO lmao ofc the entropy changes w resolution, literally theres more px to count dumbass
-resolution = 4/3
+resolution = 8/10
 
 def populateGridRandomly(numBeads,gridX,gridY):
     global particleCenters
@@ -327,22 +327,21 @@ def showExclSpace(particleCenter):
 def entropy():
     tic = time.time()
     S = 0
-    n = 0
+    numParts = 0 # number of particles counted
+    nbead = len(occShape) # number of px in a particle
     for p in particleCenters:
-        #print(n)
         # don't count particles that are offgrid
         # TODO could also just check if len(pxOcc) == 0, is that more elegant?
         if p[0] < 0 or p[0] >= gridSize[0] or p[1] < 0 or p[1] >= gridSize[1]:
             continue
-        n += 1
-        space = freeSpace(p)
-        V = len(space)
-        particleVol = len(pxOccupiedByParticle(p))
-        S += np.log(V/particleVol)
+        numParts += 1
+        nfree = len(freeSpace(p)) # number of px available to move to
+        S += np.log(nfree/nbead)
         #S += np.log(V)
     toc = time.time()
     print('time: '+str(toc-tic))
     print('entropy: '+str(S))
+    print('numParts: '+str(numParts))
     return S
 
 # counts possible configurations of particles in i_neighbors, the lazy way (ie treat each neighbor as if its independent of the others)
@@ -390,7 +389,7 @@ def volumeFraction():
 
 populateGrid()
 
-print(beadRad)
+print('beadRad: '+str(beadRad))
 #print(volumeFraction())
 #entropy()
 showGrid()
@@ -399,7 +398,7 @@ showGrid()
 #print(neighborConfigs())
 
 #showGrid()
-#print(particleCenters)
+#print(len(particleCenters))
 #showFreeSpace((4,4))
 
 # this is for testForNearestNeighbors2
