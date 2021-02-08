@@ -5,6 +5,7 @@ import time
 import bisect
 import random
 import operator
+import os
 
 class PolycrystalGrid:
     # class fields:
@@ -32,6 +33,7 @@ class PolycrystalGrid:
             reader = csv.reader(csvFile, delimiter=',')
             first = True
             for row in reader:
+                # TODO resolution stuff would probably need to change for a hexagonal grid
                 # first line of csv gives xmin, ymin, grid dimensions, and bead radius
                 if first:
                     self.xmin = int(row[0])
@@ -67,6 +69,7 @@ class PolycrystalGrid:
         pxToCheck = [(x0,y0)]
         occupied = []
         for (x,y) in pxToCheck:
+            # TODO tryin out exclusive
             if dist((x0,y0),(x,y)) <= self.beadRad:
                 occupied.append((x-x0,y-y0))
                 neighbors = self.getNeighbors((x,y))
@@ -108,6 +111,7 @@ class PolycrystalGrid:
         return excluded
 
     def getNeighbors(self,p):
+        # TODO this would need to change for a hexagonal grid
         (x,y) = p
         neighbors = []
         # remember: we include 0 and exclude gridSize
@@ -240,7 +244,6 @@ class PolycrystalGrid:
         nbead = len(self.beadShape) # number of px in a particle
         for p in self.particleCenters:
             # don't count particles that are offgrid
-            # TODO could also just check if len(pxOcc) == 0, is that more elegant?
             if p[0] < 0 or p[0] >= self.gridSize[0] or p[1] < 0 or p[1] >= self.gridSize[1]:
                 continue
             numParts += 1
@@ -248,10 +251,20 @@ class PolycrystalGrid:
             S += np.log(nfree/nbead)
 
         toc = time.time()
-        print('time: '+str(toc-tic))
-        print('entropy: '+str(S))
-        print('numParts: '+str(numParts))
-        return S
+        return [S,numParts,toc-tic]
+    
+    def entropyNoEdgeBeads(self):
+        S = 0
+        numParts = 0
+        nbead = len(self.beadShape)
+        for p in self.particleCenters:
+            # don't count particles that aren't fully on the grid
+            if len(self.pxOccupiedByParticle(p)) < nbead:
+                continue
+            numParts += 1
+            nfree = len(self.freeSpace(p)) # number of px available to move to
+            S += np.log(nfree/nbead)
+        return [S,numParts]
 
     # counts possible configurations of particles in i_neighbors, the lazy way (ie treat each neighbor as if its independent of the others)
     # returns ln(total # configs)
@@ -293,6 +306,7 @@ class PolycrystalGrid:
 
 
     def volumeFraction(self):
+        # TODO this would need to change for a hexagonal grid
         return len(self.occupiedPx) / self.gridSize[0] / self.gridSize[1]
 
     # randomly populates a gridX-by-gridY grid with numBeads beads of radius rad
@@ -348,28 +362,41 @@ def dist(p1,p2):
     return np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
 
 
-myColloid = PolycrystalGrid('annasNewCrystalRandom.csv')
-# TODO figure out why isAvailable is apparently always giving true?
-myColloid.populateGridRandomly(25,myColloid.gridSize[0],myColloid.gridSize[1],myColloid.beadRad)
-#print(len(myColloid.occupiedPx))
-myColloid.showGrid()
+#coll = PolycrystalGrid('oneBead.csv',resolution=3)
+#coll.showGrid()
+
+resolutions = [15,16,17,18,19,20]
+with open('areaFractions4.csv','w',newline='') as file:
+    writer = csv.writer(file)
+    writer.writerow(['beadRad','occupied px','px in square','fraction'])
+    for res in resolutions:
+        coll = PolycrystalGrid('oneBead.csv',resolution=res)
+        occ = len(coll.occupiedPx)
+        square = 4*coll.beadRad*coll.beadRad
+        writer.writerow([coll.beadRad,occ,square,occ/square])
+
+'''resolutions = [4/5,1,6/5,7/5,8/5,9/5,2,11/5,12/5]
+#resolutions = [5/10,6/10,7/10,8/10,9/10,1,11/10,12/10,13/10]
+#resolutions = [3/4,1,5/4,6/4,7/4,8/4,9/4,10/4,11/4,12/4,13/4,14/4,15/4,16/4,17/4]
+with open('readShockResDataNowExclusive2.csv','w',newline='') as file:
+    writer = csv.writer(file)
+    writer.writerow(['beadRad','S','N','S/N','runtime'])
+    for res in resolutions:
+        coll = PolycrystalGrid('readshock/readshock2_2p5.csv',resolution=res)
+        print(coll.beadRad)
+        [S, N, runtime] = coll.entropy()
+        writer.writerow([coll.beadRad,S,N,S/N,runtime])'''
 
 
-# this is for testForNearestNeighbors2
-#totFreeSpace = sorted( freeSpace((4,4)) )
-#tic = time.time()
-#print(numConfigs(3,totFreeSpace))
-#print('time: '+str(time.time()-tic))
+#dir = r'C:\Users\anna2\OneDrive\Documents\Gerbode\python\readshock'
+'''with open('edgesOrNoEdges.csv','w',newline='') as dataOut:
+    writer = csv.writer(dataOut)
+    writer.writerow(['file','S_edges','N_edges','S/N_edges','S_noedges','N_noedges','S/N_noedges'])
+    for filename in os.listdir(dir):
+        if (filename.startswith("readshock1") or filename.startswith("readshock2")) and filename.endswith(".csv"):
+            print(filename)
+            coll = PolycrystalGrid('readshock/'+filename,resolution=9/5)
+            [S1,N1,runtime] = coll.entropy()
+            [S2,N2] = coll.entropyNoEdgeBeads()
+            writer.writerow([filename,S1,N1,S1/N1,S2,N2,S2/N2])'''
 
-# this is for testForNearestNeighbors
-#totFreeSpace = sorted( freeSpace((2,2)) )
-#tic = time.time()
-#print(numConfigs(6,totFreeSpace))
-#print('time: '+str(time.time()-tic))
-
-
-# this is for nearestNeighborsHard
-#totFreeSpace = sorted( freeSpace((21,14)) + freeSpace((21,32)) )
-#tic = time.time()
-#print(numConfigs(3,totFreeSpace))
-#print('time: '+str(time.time()-tic))
