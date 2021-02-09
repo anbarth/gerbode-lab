@@ -362,10 +362,10 @@ def dist(p1,p2):
     return np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
 
 
-#coll = PolycrystalGrid('oneBead.csv',resolution=3)
+#coll = PolycrystalGrid('small.csv',resolution=3)
 #coll.showGrid()
 
-resolutions = [15,16,17,18,19,20]
+'''resolutions = [15,16,17,18,19,20]
 with open('areaFractions4.csv','w',newline='') as file:
     writer = csv.writer(file)
     writer.writerow(['beadRad','occupied px','px in square','fraction'])
@@ -373,19 +373,19 @@ with open('areaFractions4.csv','w',newline='') as file:
         coll = PolycrystalGrid('oneBead.csv',resolution=res)
         occ = len(coll.occupiedPx)
         square = 4*coll.beadRad*coll.beadRad
-        writer.writerow([coll.beadRad,occ,square,occ/square])
+        writer.writerow([coll.beadRad,occ,square,occ/square])'''
 
-'''resolutions = [4/5,1,6/5,7/5,8/5,9/5,2,11/5,12/5]
+resolutions = [4/5,1,6/5,7/5,8/5,9/5,2,11/5,12/5]
 #resolutions = [5/10,6/10,7/10,8/10,9/10,1,11/10,12/10,13/10]
 #resolutions = [3/4,1,5/4,6/4,7/4,8/4,9/4,10/4,11/4,12/4,13/4,14/4,15/4,16/4,17/4]
-with open('readShockResDataNowExclusive2.csv','w',newline='') as file:
+with open('readShockSpeedyTest.csv','w',newline='') as file:
     writer = csv.writer(file)
     writer.writerow(['beadRad','S','N','S/N','runtime'])
     for res in resolutions:
-        coll = PolycrystalGrid('readshock/readshock2_2p5.csv',resolution=res)
+        coll = PolycrystalGrid('readshock/readshock3_15.csv',resolution=res)
         print(coll.beadRad)
         [S, N, runtime] = coll.entropy()
-        writer.writerow([coll.beadRad,S,N,S/N,runtime])'''
+        writer.writerow([coll.beadRad,S,N,S/N,runtime])
 
 
 #dir = r'C:\Users\anna2\OneDrive\Documents\Gerbode\python\readshock'
