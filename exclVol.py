@@ -6,6 +6,7 @@ import bisect
 import random
 import operator
 import os
+import multiprocessing as mp
 
 class PolycrystalGrid:
     # class fields:
@@ -205,6 +206,9 @@ class PolycrystalGrid:
                         pxToCheck.append(neighbor)
         return freePx
 
+    def freeSpaceArea(self,particleCenter):
+        return len(self.freeSpace(particleCenter))
+
     def showFreeSpace(self,particleCenter):
         freePx = self.freeSpace(particleCenter)
 
@@ -238,6 +242,7 @@ class PolycrystalGrid:
         plt.show()
 
     def entropy(self):
+        print('--- sequential entropy')
         tic = time.time()
         S = 0
         numParts = 0 # number of particles counted
@@ -253,6 +258,46 @@ class PolycrystalGrid:
         toc = time.time()
         return [S,numParts,toc-tic]
     
+    def simpleParallel(self):
+        tic = time.time()
+        tot = 0
+        numParts = len(self.particleCenters)
+
+        with mp.Pool(mp.cpu_count()) as pool:
+            pool_results = [pool.apply_async(dist,args=[p,(0,0)]) for p in self.particleCenters]
+            #pool_results = pool.imap_unordered(distFrom0, self.particleCenters)
+            for r in pool_results:
+                dis = r.get()
+                tot += dis/numParts
+
+        toc = time.time()
+        return [tot,toc-tic]
+
+    def entropyParallel(self):
+        print('--- parallel entropy')
+        tic = time.time()
+        
+        particlesInGrid = []
+        for p in self.particleCenters:
+            if p[0] < 0 or p[0] >= self.gridSize[0] or p[1] < 0 or p[1] >= self.gridSize[1]:
+                continue
+            particlesInGrid.append(p)
+        numParts = len(particlesInGrid) # number of particles counted
+        #print(numParts)
+        nbead = len(self.beadShape) # number of px in a particle
+        S = 0
+
+        with mp.Pool(mp.cpu_count()) as pool:
+            #pool_results = [pool.apply_async(self.freeSpaceArea,args=[p]) for p in particlesInGrid]
+            pool_results = pool.imap_unordered(self.freeSpaceArea, particlesInGrid)
+            for r in pool_results:
+                nfree = r # number of px available to move to
+                S += np.log(nfree/nbead)
+
+        toc = time.time()
+        return [S,numParts,toc-tic]
+        
+
     def entropyNoEdgeBeads(self):
         S = 0
         numParts = 0
@@ -356,14 +401,25 @@ class PolycrystalGrid:
                 writer.writerow([x,y])
 
 
+
+
+
 def dist(p1,p2):
     (x1,y1) = p1
     (x2,y2) = p2
     return np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
 
+def f(x):
+    return x*x
 
-#coll = PolycrystalGrid('small.csv',resolution=3)
+
 #coll.showGrid()
+#print(coll.simpleParallel())
+if __name__ == '__main__':
+    coll = PolycrystalGrid('readshock/readshock3_15.csv',resolution=1)
+    print(coll.entropyParallel())
+    print(coll.entropy())
+
 
 '''resolutions = [15,16,17,18,19,20]
 with open('areaFractions4.csv','w',newline='') as file:
@@ -375,7 +431,7 @@ with open('areaFractions4.csv','w',newline='') as file:
         square = 4*coll.beadRad*coll.beadRad
         writer.writerow([coll.beadRad,occ,square,occ/square])'''
 
-resolutions = [4/5,1,6/5,7/5,8/5,9/5,2,11/5,12/5]
+'''resolutions = [4/5,1,6/5,7/5,8/5,9/5,2,11/5,12/5]
 #resolutions = [5/10,6/10,7/10,8/10,9/10,1,11/10,12/10,13/10]
 #resolutions = [3/4,1,5/4,6/4,7/4,8/4,9/4,10/4,11/4,12/4,13/4,14/4,15/4,16/4,17/4]
 with open('readShockSpeedyTest.csv','w',newline='') as file:
@@ -385,7 +441,7 @@ with open('readShockSpeedyTest.csv','w',newline='') as file:
         coll = PolycrystalGrid('readshock/readshock3_15.csv',resolution=res)
         print(coll.beadRad)
         [S, N, runtime] = coll.entropy()
-        writer.writerow([coll.beadRad,S,N,S/N,runtime])
+        writer.writerow([coll.beadRad,S,N,S/N,runtime])'''
 
 
 #dir = r'C:\Users\anna2\OneDrive\Documents\Gerbode\python\readshock'
