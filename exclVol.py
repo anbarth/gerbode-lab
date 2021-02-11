@@ -242,7 +242,7 @@ class PolycrystalGrid:
         plt.show()
 
     def entropy(self):
-        print('--- sequential entropy')
+        #print('--- sequential entropy')
         tic = time.time()
         S = 0
         numParts = 0 # number of particles counted
@@ -273,8 +273,8 @@ class PolycrystalGrid:
         toc = time.time()
         return [tot,toc-tic]
 
-    def entropyParallel(self):
-        print('--- parallel entropy')
+    def entropyParallel(self,numProc):
+        #print('--- parallel entropy')
         tic = time.time()
         
         particlesInGrid = []
@@ -287,12 +287,15 @@ class PolycrystalGrid:
         nbead = len(self.beadShape) # number of px in a particle
         S = 0
 
-        with mp.Pool(mp.cpu_count()) as pool:
-            #pool_results = [pool.apply_async(self.freeSpaceArea,args=[p]) for p in particlesInGrid]
-            pool_results = pool.imap_unordered(self.freeSpaceArea, particlesInGrid)
-            for r in pool_results:
-                nfree = r # number of px available to move to
-                S += np.log(nfree/nbead)
+        #with mp.Pool(10) as pool:
+        pool = mp.Pool(numProc)
+        pool_results = [pool.apply_async(self.freeSpaceArea,args=[p]) for p in particlesInGrid]
+        pool.close()
+        pool.join()
+        #pool_results = pool.imap_unordered(self.freeSpaceArea, particlesInGrid)
+        for r in pool_results:
+            nfree = r.get() # number of px available to move to
+            S += np.log(nfree/nbead)
 
         toc = time.time()
         return [S,numParts,toc-tic]
@@ -333,7 +336,10 @@ class PolycrystalGrid:
         
         configs = 0
         n = 0
+        ntot = len(freePx) # TODO delete
         for p in freePx:
+            if numBeads == 6: # TODO delete
+                print(n/ntot) # progress TODO delete
             # consider all the freePx... except the ones that have been already touched by this bead
             newFreePx = freePx[n:]
             # remove all the newly excluded positions from newFreePx
@@ -344,7 +350,7 @@ class PolycrystalGrid:
                 index = bisect.bisect_left(newFreePx, q)
                 if index != len(newFreePx) and newFreePx[index] == q:
                     del newFreePx[index]
-            configs += numConfigs(numBeads-1,newFreePx)
+            configs += self.numConfigs(numBeads-1,newFreePx)
             n += 1
 
         return configs
@@ -358,7 +364,7 @@ class PolycrystalGrid:
     # overwrites whatever this PolycrystalGrid used to be
     def populateGridRandomly(self,numBeads,gridX,gridY,rad):
 
-        gridSize = [gridX,gridY]
+        self.gridSize = [gridX,gridY]
         self.xmin = 0
         self.ymin = 0
         self.beadRad = rad
@@ -397,11 +403,8 @@ class PolycrystalGrid:
         with open(fname,'w',newline='') as csvFile:
             writer = csv.writer(csvFile,delimiter=',')
             writer.writerow([self.xmin,self.ymin,self.gridSize[0],self.gridSize[1],self.beadRad])
-            for (x,y) in particleCenters:        
+            for (x,y) in self.particleCenters:        
                 writer.writerow([x,y])
-
-
-
 
 
 def dist(p1,p2):
@@ -409,16 +412,27 @@ def dist(p1,p2):
     (x2,y2) = p2
     return np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
 
-def f(x):
-    return x*x
+
+coll = PolycrystalGrid('nearestNeighborsHard.csv')
+space = sorted(coll.freeSpace((20,15)))
+with open('nearestNeighborConfigs2.csv','w',newline='') as file:
+    writer = csv.writer(file)
+    writer.writerow(['num beads','num configs','runtime'])
+    #for n in range(6,6):
+    n=6
+    print(n)
+    tic = time.time()
+    configs = coll.numConfigs(n,space)
+    toc = time.time()
+    writer.writerow([n,configs,toc-tic])
 
 
 #coll.showGrid()
 #print(coll.simpleParallel())
-if __name__ == '__main__':
-    coll = PolycrystalGrid('readshock/readshock3_15.csv',resolution=1)
-    print(coll.entropyParallel())
-    print(coll.entropy())
+#if __name__ == '__main__':
+#    coll = PolycrystalGrid('readshock/readshock3_15.csv',resolution=2)
+#    print(coll.entropyParallel())
+#    print(coll.entropy())
 
 
 '''resolutions = [15,16,17,18,19,20]
@@ -431,17 +445,37 @@ with open('areaFractions4.csv','w',newline='') as file:
         square = 4*coll.beadRad*coll.beadRad
         writer.writerow([coll.beadRad,occ,square,occ/square])'''
 
-'''resolutions = [4/5,1,6/5,7/5,8/5,9/5,2,11/5,12/5]
-#resolutions = [5/10,6/10,7/10,8/10,9/10,1,11/10,12/10,13/10]
-#resolutions = [3/4,1,5/4,6/4,7/4,8/4,9/4,10/4,11/4,12/4,13/4,14/4,15/4,16/4,17/4]
-with open('readShockSpeedyTest.csv','w',newline='') as file:
-    writer = csv.writer(file)
-    writer.writerow(['beadRad','S','N','S/N','runtime'])
-    for res in resolutions:
-        coll = PolycrystalGrid('readshock/readshock3_15.csv',resolution=res)
-        print(coll.beadRad)
-        [S, N, runtime] = coll.entropy()
-        writer.writerow([coll.beadRad,S,N,S/N,runtime])'''
+'''if __name__ == '__main__':
+    #resolutions = [4/5,1,6/5,7/5,8/5,9/5,2,11/5,12/5,13/5,14/5,3,16/5,17/5,18/5,19/5,4,21/5]
+    #resolutions = [22/5,23/5,24/5,5]
+    resolutions = [26/5,27/5,28/5,29/5,6]
+    #resolutions = [5/10,6/10,7/10,8/10,9/10,1,11/10,12/10,13/10]
+    #resolutions = [3/4,1,5/4,6/4,7/4,8/4,9/4,10/4,11/4,12/4,13/4,14/4,15/4,16/4,17/4]
+    with open('megaResolutionTest3.csv','w',newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['beadRad','S','N','S/N','runtime'])
+        for res in resolutions:
+            coll = PolycrystalGrid('readshock/readshock3_15.csv',resolution=res)
+            print(coll.beadRad)
+            [S, N, runtime] = coll.entropyParallel(40)
+            #[S2, N2, runtime2] = coll.entropyParallel()
+            writer.writerow([coll.beadRad,S,N,S/N,runtime])'''
+
+'''if __name__ == '__main__':
+    resolutions = [4/5,1,6/5,7/5,8/5,9/5,2,11/5,12/5,13/5,14/5,3,16/5,17/5,18/5,19/5,20/5]
+    #resolutions = [5/10,6/10,7/10,8/10,9/10,1,11/10,12/10,13/10]
+    #resolutions = [3/4,1,5/4,6/4,7/4,8/4,9/4,10/4,11/4,12/4,13/4,14/4,15/4,16/4,17/4]
+    with open('megaResolutionData.csv','w',newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['beadRad','S_80','t_80'])
+        for res in resolutions:
+            coll = PolycrystalGrid('readshock/readshock4_7p5.csv',resolution=res)
+            print(coll.beadRad)
+            [S, N, t] = coll.entropyParallel(80)
+            #[S10, N10, t10] = coll.entropyParallel(10)
+            #[S20, N20, t20] = coll.entropyParallel(20)
+            #[S40, N40, t40] = coll.entropyParallel(40)
+            writer.writerow([coll.beadRad,S,t])'''
 
 
 #dir = r'C:\Users\anna2\OneDrive\Documents\Gerbode\python\readshock'
