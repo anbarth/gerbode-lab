@@ -17,19 +17,23 @@ class PolycrystalGrid:
     #   particleCenters: 
     #   occupiedPx: a list of grid spots occupied by (x,y)s
     #   resolution: 
+    #   psi6: does the file contain psi6 magnitude data?
 
     # constructor takes the input csv file
-    def __init__(self,fname,resolution=1):
+    def __init__(self,fname,resolution=1,usePsi6=False):
 
         self.resolution = resolution
         self.particleCenters = []
+        self.psi6s = []
         self.occupiedPx = []
         self.exclShape = []
         self.beadShape = []
+        self.snowflakeShape = []
+        self.usePsi6 = usePsi6
+        self.psi6cutoff = 0.98
 
 
-
-        # read in particle centers from csv
+        # read in particle centers (and optionally, |psi6|) from csv
         with open(fname) as csvFile:
             reader = csv.reader(csvFile, delimiter=',')
             first = True
@@ -44,17 +48,24 @@ class PolycrystalGrid:
                     first = False
                     continue
                 # after the first line, it's particle centers all the way down
+                # TODO im about to implement psi6 stuff in a way that means the order of this list might now matter
                 self.particleCenters.append( (round( (float(row[0])-self.xmin)*resolution ),
                                               round( (float(row[1])-self.ymin)*resolution )) )
-
-        # particles always have the same shape -- find that shape
-        self.setBeadShape() 
+                if self.usePsi6: 
+                    self.psi6s.append(float(row[-1]))
+                
+        # particles and exclused volumes always have the same shapes
+        # so set those shapes once at the beginning and recycle them
+        self.setBeadShape() # do this one first, bc setExclShape relies on setBeadShape
         self.setExclShape() 
 
         # fill in all the occupied pixels
         for (x0,y0) in self.particleCenters:
             self.occupiedPx.extend(self.pxOccupiedByParticle((x0,y0)))
         self.occupiedPx = sorted(self.occupiedPx)
+
+        if self.usePsi6:
+            self.setSnowflakeShape()
 
     # sets the shape of a particle centered at (0,0), so you can translate it to any other position
     # ^ that's what pxOccupiedByParticle does
@@ -110,6 +121,27 @@ class PolycrystalGrid:
 
         self.exclShape = excluded
         return excluded
+
+    # neatParticlePos is the position of a particle with perfect or near-perfect |psi6|=1
+    # in the future i'd like to be able to just look up a particle like this automatically, ie look for max psi6
+    # or the average |psi6| among particles below the cutoff
+    def setSnowflakeShape(self):
+        # TODO anna you're in the middle of writing this fxn
+        # when its done, try running testSimple and get entropy for annasCoolTest10.csv
+        for i in range(len(self.particleCenters)):
+            p = self.particleCenters[i]
+            buffer = self.beadRad*2
+            if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
+               p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
+                continue
+            if self.psi6s[i] >= self.psi6cutoff:
+                freePx = self.freeSpace(p)
+                snowflake = [(x-p[0],y-p[1]) for (x,y) in freePx]
+                self.snowflakeShape = snowflake
+                return snowflake
+        print("failed to find a special snowflake </3")
+        return [] # failure :(
+
 
     def getNeighbors(self,p):
         # TODO this would need to change for a hexagonal grid
@@ -247,31 +279,28 @@ class PolycrystalGrid:
         S = 0
         numParts = 0 # number of particles counted
         nbead = len(self.beadShape) # number of px in a particle
-        for p in self.particleCenters:
-            # don't count particles that are offgrid
-            if p[0] < 0 or p[0] >= self.gridSize[0] or p[1] < 0 or p[1] >= self.gridSize[1]:
+        for i in range(len(self.particleCenters)):
+            p = self.particleCenters[i]
+            # don't count particles that are too close to the edge
+            buffer = self.beadRad*2
+            if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
+               p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
                 continue
+            
             numParts += 1
+
+            if self.usePsi6:
+                if self.psi6s[i] >= 0.98: # TODO or something
+                    nfree = len(self.snowflakeShape)
+                    S += np.log(nfree/nbead)
+                    continue
+
             nfree = len(self.freeSpace(p)) # number of px available to move to
             S += np.log(nfree/nbead)
 
         toc = time.time()
         return [S,numParts,toc-tic]
     
-    def simpleParallel(self):
-        tic = time.time()
-        tot = 0
-        numParts = len(self.particleCenters)
-
-        with mp.Pool(mp.cpu_count()) as pool:
-            pool_results = [pool.apply_async(dist,args=[p,(0,0)]) for p in self.particleCenters]
-            #pool_results = pool.imap_unordered(distFrom0, self.particleCenters)
-            for r in pool_results:
-                dis = r.get()
-                tot += dis/numParts
-
-        toc = time.time()
-        return [tot,toc-tic]
 
     def entropyParallel(self,numProc):
         #print('--- parallel entropy')
@@ -300,19 +329,6 @@ class PolycrystalGrid:
         toc = time.time()
         return [S,numParts,toc-tic]
         
-
-    def entropyNoEdgeBeads(self):
-        S = 0
-        numParts = 0
-        nbead = len(self.beadShape)
-        for p in self.particleCenters:
-            # don't count particles that aren't fully on the grid
-            if len(self.pxOccupiedByParticle(p)) < nbead:
-                continue
-            numParts += 1
-            nfree = len(self.freeSpace(p)) # number of px available to move to
-            S += np.log(nfree/nbead)
-        return [S,numParts]
 
     # counts possible configurations of particles in i_neighbors, the lazy way (ie treat each neighbor as if its independent of the others)
     # returns ln(total # configs)
