@@ -307,11 +307,20 @@ class PolycrystalGrid:
         tic = time.time()
         
         particlesInGrid = []
-        for p in self.particleCenters:
-            if p[0] < 0 or p[0] >= self.gridSize[0] or p[1] < 0 or p[1] >= self.gridSize[1]:
+        shortcutParticles = 0
+        buffer = self.beadRad*2
+        for i in range(len(self.particleCenters)):
+            p = self.particleCenters[i]
+
+            if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
+               p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
                 continue
-            particlesInGrid.append(p)
-        numParts = len(particlesInGrid) # number of particles counted
+            elif self.usePsi6 and self.psi6s[i] >= 0.98: # TODO or something
+                    shortcutParticles += 1
+                    continue
+            else:
+                particlesInGrid.append(p)
+        numParts = len(particlesInGrid) + shortcutParticles # number of particles counted
         #print(numParts)
         nbead = len(self.beadShape) # number of px in a particle
         S = 0
@@ -325,6 +334,10 @@ class PolycrystalGrid:
         for r in pool_results:
             nfree = r.get() # number of px available to move to
             S += np.log(nfree/nbead)
+
+        # add in all the psi6 shortcut particles
+        if self.usePsi6:
+            S += shortcutParticles * np.log(len(self.snowflakeShape)/nbead)
 
         toc = time.time()
         return [S,numParts,toc-tic]
