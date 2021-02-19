@@ -2,6 +2,7 @@ import numpy as np
 import csv
 import matplotlib.pyplot as plt
 import exclVol
+import importlib
 importlib.reload(exclVol)
 
 coll = PolycrystalGrid('nearestNeighborsHard.csv')
