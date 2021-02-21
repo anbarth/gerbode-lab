@@ -1,27 +1,20 @@
-import numpy as np
 import csv
-import matplotlib.pyplot as plt
 import exclVol
 import importlib
+import os
 importlib.reload(exclVol)
 
 if __name__ == '__main__':
-    coll = exclVol.PolycrystalGrid('readshock2/rs5_1.csv')
-    print(coll.entropy())
-    print(coll.entropyParallel(40))
 
-    coll2 = exclVol.PolycrystalGrid('readshock2/rs5_1.csv',usePsi6=True)
-    print(coll2.entropy())
-    print(coll2.entropyParallel(40))
-
-    #dir = r'C:\Users\GerbodeLab\Documents\banana\gerbode-lab\readshock2'
-    '''with open('psi6shortcutTest.csv','w',newline='') as dataOut:
+    dir = r'C:\Users\GerbodeLab\Documents\banana\gerbode-lab\readshock2'
+    with open('psi6shortcutTest2.csv','w',newline='') as dataOut:
         writer = csv.writer(dataOut)
-        writer.writerow(['file','S_hard','N_hard','S/N_edges','S_noedges','N_noedges','S/N_noedges'])
-        for filename in os.listdir(dir):
-            if (filename.startswith("readshock1") or filename.startswith("readshock2")) and filename.endswith(".csv"):
-                print(filename)
-                coll = PolycrystalGrid('readshock/'+filename,resolution=9/5)
-                [S1,N1,runtime] = coll.entropy()
-                [S2,N2] = coll.entropyNoEdgeBeads()
-                writer.writerow([filename,S1,N1,S1/N1,S2,N2,S2/N2])'''
+        writer.writerow(['file','S_nocut','N_nocut','S/N_nocut','t_nocut','S_cut','N_cut','S/N_cut','t_cut'])
+        #for filename in os.listdir(dir):
+        for filename in ['rs10_1.csv']:
+            print(filename)
+            coll = exclVol.PolycrystalGrid('readshock2/'+filename,resolution=35/5)
+            [S1,N1,time1] = coll.entropyParallel(40)
+            coll2 = exclVol.PolycrystalGrid('readshock2/'+filename,resolution=35/5,usePsi6=True)
+            [S2,N2,time2] = coll2.entropyParallel(40)
+            writer.writerow([filename,S1,N1,S1/N1,time1,S2,N2,S2/N2,time2])
