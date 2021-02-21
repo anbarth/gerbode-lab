@@ -300,12 +300,47 @@ class PolycrystalGrid:
 
         toc = time.time()
         return [S,numParts,toc-tic]
-    
+
+    def entropyHisto(self):
+        tic = time.time()
+        S = 0
+        Smain = []
+        Ssnow = []
+        numParts = 0 # number of particles counted
+        nbead = len(self.beadShape) # number of px in a particle
+        for i in range(len(self.particleCenters)):
+            p = self.particleCenters[i]
+            # don't count particles that are too close to the edge
+            buffer = self.beadRad*2
+            if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
+               p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
+                continue
+            
+            numParts += 1
+
+            #if self.usePsi6:
+            #    if self.psi6s[i] >= 0.98: # TODO or something
+            #        nfree = len(self.snowflakeShape)
+            #        S += np.log(nfree/nbead)
+            #        continue
+
+            nfree = len(self.freeSpace(p)) # number of px available to move to
+            Si = np.log(nfree/nbead)
+            S += Si
+            if self.psi6s[i] >= 0.98:
+                Ssnow.append(Si)
+            else:
+                Smain.append(Si)
+
+
+
+        toc = time.time()
+        return [S,Smain,Ssnow,numParts,toc-tic]
+   
 
     def entropyParallel(self,numProc):
         #print('--- parallel entropy')
         tic = time.time()
-        
         particlesInGrid = []
         shortcutParticles = 0
         buffer = self.beadRad*2
