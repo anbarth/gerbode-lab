@@ -241,6 +241,9 @@ class PolycrystalGrid:
     def freeSpaceArea(self,particleCenter):
         return len(self.freeSpace(particleCenter))
 
+    def freeSpaceAreaAndPsi6(self,i):
+        return (len(self.freeSpace(self.particleCenters[i])), (self.psi6s[i] >= 0.98) )
+
     def showFreeSpace(self,particleCenter):
         freePx = self.freeSpace(particleCenter)
 
@@ -332,11 +335,53 @@ class PolycrystalGrid:
             else:
                 Smain.append(Si)
 
-
-
         toc = time.time()
         return [S,Smain,Ssnow,numParts,toc-tic]
    
+    def entropyParallelHisto(self,numProc):
+        tic = time.time()
+        particlesInGrid = []
+
+        buffer = self.beadRad*2
+        for i in range(len(self.particleCenters)):
+            p = self.particleCenters[i]
+
+            if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
+               p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
+                continue
+            #elif self.usePsi6 and self.psi6s[i] >= 0.98: # TODO or something
+            #        shortcutParticles += 1
+            #        continue
+            else:
+                particlesInGrid.append(i)
+        numParts = len(particlesInGrid) # number of particles counted
+        nbead = len(self.beadShape) # number of px in a particle
+        S = 0
+        Smain = []
+        Ssnow = []
+
+ 
+        pool = mp.Pool(numProc)
+        pool_results = [pool.apply_async(self.freeSpaceAreaAndPsi6,args=[i]) for i in particlesInGrid]
+        pool.close()
+        pool.join()
+        #pool_results = pool.imap_unordered(self.freeSpaceArea, particlesInGrid)
+        for r in pool_results:
+            (nfree, psi6overCutoff) = r.get()
+            Si = np.log(nfree/nbead)
+            S += Si
+            if psi6overCutoff:
+                Ssnow.append(Si)
+            else:
+                Smain.append(Si)
+
+        # add in all the psi6 shortcut particles
+        #if self.usePsi6:
+        #    S += shortcutParticles * np.log(len(self.snowflakeShape)/nbead)
+
+        toc = time.time()
+        return [S,Smain,Ssnow,numParts,toc-tic]
+
 
     def entropyParallel(self,numProc):
         #print('--- parallel entropy')
