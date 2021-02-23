@@ -242,7 +242,7 @@ class PolycrystalGrid:
         return len(self.freeSpace(particleCenter))
 
     def freeSpaceAreaAndPsi6(self,i):
-        return (len(self.freeSpace(self.particleCenters[i])), (self.psi6s[i] >= 0.98) )
+        return (len(self.freeSpace(self.particleCenters[i])), self.psi6s[i] )
 
     def showFreeSpace(self,particleCenter):
         freePx = self.freeSpace(particleCenter)
@@ -357,8 +357,7 @@ class PolycrystalGrid:
         numParts = len(particlesInGrid) # number of particles counted
         nbead = len(self.beadShape) # number of px in a particle
         S = 0
-        Smain = []
-        Ssnow = []
+        Sbead = []
 
  
         pool = mp.Pool(numProc)
@@ -367,20 +366,17 @@ class PolycrystalGrid:
         pool.join()
         #pool_results = pool.imap_unordered(self.freeSpaceArea, particlesInGrid)
         for r in pool_results:
-            (nfree, psi6overCutoff) = r.get()
+            (nfree, psi6) = r.get()
             Si = np.log(nfree/nbead)
             S += Si
-            if psi6overCutoff:
-                Ssnow.append(Si)
-            else:
-                Smain.append(Si)
+            Sbead.append((Si,psi6))
 
         # add in all the psi6 shortcut particles
         #if self.usePsi6:
         #    S += shortcutParticles * np.log(len(self.snowflakeShape)/nbead)
 
         toc = time.time()
-        return [S,Smain,Ssnow,numParts,toc-tic]
+        return [S,Sbead,numParts,toc-tic]
 
 
     def entropyParallel(self,numProc):
