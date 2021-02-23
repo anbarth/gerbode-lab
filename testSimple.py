@@ -7,5 +7,5 @@ importlib.reload(exclVol)
 
 
 
-coll = exclVol.PolycrystalGrid('readshock2/'+'rs10_1.csv',resolution=35/5,usePsi6=True)
-#coll.showGrid()
+coll = exclVol.PolycrystalGrid('tinyTest3_10.csv',rad=10,usePsi6=True)
+coll.showGrid()

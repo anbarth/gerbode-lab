@@ -20,9 +20,9 @@ class PolycrystalGrid:
     #   psi6: does the file contain psi6 magnitude data?
 
     # constructor takes the input csv file
-    def __init__(self,fname,resolution=1,usePsi6=False):
+    def __init__(self,fname,rad=0,usePsi6=False):
 
-        self.resolution = resolution
+        #self.resolution = resolution
         self.particleCenters = []
         self.psi6s = []
         self.occupiedPx = []
@@ -41,10 +41,17 @@ class PolycrystalGrid:
                 # TODO resolution stuff would probably need to change for a hexagonal grid
                 # first line of csv gives xmin, ymin, grid dimensions, and bead radius
                 if first:
+                    resolution = 0
+                    if rad == 0:
+                        resolution = 1
+                        self.beadRad = round( float(row[4])*resolution )
+                    else:
+                        resolution = rad/float(row[4])
+                        self.beadRad = rad
                     self.xmin = int(row[0])
                     self.ymin = int(row[1])
                     self.gridSize = [round( int(row[2])*resolution ),round( int(row[3])*resolution )]
-                    self.beadRad = round( float(row[4])*resolution )
+                    
                     first = False
                     continue
                 # after the first line, it's particle centers all the way down
