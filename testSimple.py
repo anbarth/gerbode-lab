@@ -6,6 +6,6 @@ import importlib
 importlib.reload(exclVol)
 
 
-
-coll = exclVol.PolycrystalGrid('readshock2/'+'rs10_1.csv',resolution=35/5,usePsi6=True)
-#coll.showGrid()
+if __name__ == '__main__':
+    coll = exclVol.PolycrystalGrid('tinyCircle1_8.csv',resolution=5,usePsi6=True)
+    coll.showGrid()
