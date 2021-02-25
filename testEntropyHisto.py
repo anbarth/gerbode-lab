@@ -7,12 +7,13 @@ import os
 importlib.reload(exclVol)
 
 if __name__ == '__main__':
-    dir = r'C:\Users\GerbodeLab\Documents\banana\gerbode-lab\readshock2'
-    for filename in os.listdir(dir):
-    #for filename in ['rs10_1.csv']:
+    #dir = r'C:\Users\GerbodeLab\Documents\banana\gerbode-lab\readshock2'
+    #for filename in os.listdir(dir):
+    for filename in ['tinyCircle1_8.csv','tinyCircle1_10.csv','tinyCircle2_8.csv','tinyCircle2_10.csv']:
         print("==================")
         print(filename)
-        coll = exclVol.PolycrystalGrid('readshock2/'+filename,resolution=4/5,usePsi6=True)
+        #coll = exclVol.PolycrystalGrid('readshock2/'+filename,resolution=35/5,usePsi6=True)
+        coll = exclVol.PolycrystalGrid(filename,rad=35,usePsi6=True)
         print("n_bead: "+str(len(coll.beadShape)))
         print("n_snow: "+str(len(coll.snowflakeShape)))
         (S,Sbead,numParts,time) = coll.entropyParallelHisto(40)
