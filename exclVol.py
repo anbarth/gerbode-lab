@@ -314,8 +314,7 @@ class PolycrystalGrid:
     def entropyHisto(self):
         tic = time.time()
         S = 0
-        Smain = []
-        Ssnow = []
+        Sbead = []
         numParts = 0 # number of particles counted
         nbead = len(self.beadShape) # number of px in a particle
         for i in range(len(self.particleCenters)):
@@ -328,22 +327,13 @@ class PolycrystalGrid:
             
             numParts += 1
 
-            #if self.usePsi6:
-            #    if self.psi6s[i] >= 0.98: # TODO or something
-            #        nfree = len(self.snowflakeShape)
-            #        S += np.log(nfree/nbead)
-            #        continue
-
-            nfree = len(self.freeSpace(p)) # number of px available to move to
+            (nfree, psi6) = self.freeSpaceAreaAndPsi6(i) # number of px available to move to
             Si = np.log(nfree/nbead)
             S += Si
-            if self.psi6s[i] >= 0.98:
-                Ssnow.append(Si)
-            else:
-                Smain.append(Si)
+            Sbead.append((Si,psi6))
 
         toc = time.time()
-        return [S,Smain,Ssnow,numParts,toc-tic]
+        return [S,Sbead,numParts,toc-tic]
    
     def entropyParallelHisto(self,numProc):
         tic = time.time()
@@ -356,9 +346,7 @@ class PolycrystalGrid:
             if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
                p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
                 continue
-            #elif self.usePsi6 and self.psi6s[i] >= 0.98: # TODO or something
-            #        shortcutParticles += 1
-            #        continue
+
             else:
                 particlesInGrid.append(i)
         numParts = len(particlesInGrid) # number of particles counted
@@ -366,21 +354,16 @@ class PolycrystalGrid:
         S = 0
         Sbead = []
 
- 
         pool = mp.Pool(numProc)
         pool_results = [pool.apply_async(self.freeSpaceAreaAndPsi6,args=[i]) for i in particlesInGrid]
         pool.close()
         pool.join()
-        #pool_results = pool.imap_unordered(self.freeSpaceArea, particlesInGrid)
+
         for r in pool_results:
             (nfree, psi6) = r.get()
             Si = np.log(nfree/nbead)
             S += Si
             Sbead.append((Si,psi6))
-
-        # add in all the psi6 shortcut particles
-        #if self.usePsi6:
-        #    S += shortcutParticles * np.log(len(self.snowflakeShape)/nbead)
 
         toc = time.time()
         return [S,Sbead,numParts,toc-tic]
