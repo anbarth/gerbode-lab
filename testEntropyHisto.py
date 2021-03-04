@@ -7,9 +7,10 @@ import os
 importlib.reload(exclVol)
 
 if __name__ == '__main__':
-    #dir = r'C:\Users\GerbodeLab\Documents\banana\gerbode-lab\readshock2'
-    #for filename in os.listdir(dir):
-    for filename in ['tinyCircle1_8.csv','tinyCircle1_10.csv','tinyCircle2_8.csv','tinyCircle2_10.csv']:
+    dir = r'C:\Users\GerbodeLab\Documents\banana\gerbode-lab\readshock2'
+    #dir = r'C:\Users\GerbodeLab\Documents\banana\gerbode-lab\readshock'
+    for filename in os.listdir(dir):
+    #for filename in ['tinyCircle1_8.csv','tinyCircle1_10.csv','tinyCircle2_8.csv','tinyCircle2_10.csv']:
         print("==================")
         print(filename)
         #coll = exclVol.PolycrystalGrid('readshock2/'+filename,resolution=35/5,usePsi6=True)

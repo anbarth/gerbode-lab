@@ -390,6 +390,7 @@ class PolycrystalGrid:
         #print(numParts)
         nbead = len(self.beadShape) # number of px in a particle
         S = 0
+        Si = []
 
         #with mp.Pool(10) as pool:
         pool = mp.Pool(numProc)
@@ -400,13 +401,14 @@ class PolycrystalGrid:
         for r in pool_results:
             nfree = r.get() # number of px available to move to
             S += np.log(nfree/nbead)
+            Si.append(np.log(nfree/nbead))
 
         # add in all the psi6 shortcut particles
         if self.usePsi6:
             S += shortcutParticles * np.log(len(self.snowflakeShape)/nbead)
 
         toc = time.time()
-        return [S,numParts,toc-tic]
+        return [S,numParts,toc-tic,Si]
         
 
     # counts possible configurations of particles in i_neighbors, the lazy way (ie treat each neighbor as if its independent of the others)
