@@ -7,6 +7,7 @@ import random
 import operator
 import os
 import multiprocessing as mp
+import PIL
 
 class PolycrystalGrid:
     # class fields:
@@ -171,13 +172,27 @@ class PolycrystalGrid:
             circ = plt.Circle((x, y), self.beadRad, color='gray', alpha=0.3)
             ax.add_artist(circ)
 
-        plt.scatter(*zip(*self.occupiedPx),marker='.')
+        plt.scatter(*zip(*self.occupiedPx),marker='.',color='black')
         plt.xlim(0,self.gridSize[0])
         plt.ylim(0,self.gridSize[1])
         #plt.xticks(np.arange(0, gridSize[0], step=1))
         #plt.yticks(np.arange(0, gridSize[1], step=1))
         #plt.grid(b=True,which='both',axis='both')
         plt.show()
+
+    def showGridNew(self):
+        scale = 5
+        # initialize a white grid
+        imgArr = np.ones((self.gridSize[1]*scale,self.gridSize[0]*scale,3),dtype=np.uint8) * 255
+        # set all the occupied px to blue
+        for (x,y) in self.occupiedPx:
+            for i in range(scale):
+                for j in range(scale):
+                    imgArr[y*scale+j,x*scale+i] = [24,96,148]
+        # TODO you should write the img to a csv or smtg
+        img = PIL.Image.fromarray(imgArr,'RGB')
+        img.show()
+
 
     def pxExcludedByParticle(self,p):
         pxExcl = []
