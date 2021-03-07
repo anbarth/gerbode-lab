@@ -90,7 +90,7 @@ class PolycrystalGrid:
         occupied = []
         for (x,y) in pxToCheck:
             # TODO tryin out exclusive
-            if dist((x0,y0),(x,y)) < self.beadRad:
+            if dist((x0,y0),(x,y)) <= self.beadRad:
                 occupied.append((x-x0,y-y0))
                 neighbors = self.getNeighbors((x,y))
                 for neighbor in neighbors:
@@ -297,6 +297,59 @@ class PolycrystalGrid:
         plt.xlim(0,self.gridSize[0])
         plt.ylim(0,self.gridSize[1])
         plt.show()
+
+    def showAllFreeSpace(self):
+
+        tic = time.time()
+
+        scale = 5
+        # initialize a white grid
+        imgArr = np.ones((self.gridSize[1]*scale,self.gridSize[0]*scale,3),dtype=np.uint8) * 255
+        # set all the occupied px to blue
+        for (x,y) in self.occupiedPx:
+            for i in range(scale):
+                for j in range(scale):
+                    imgArr[y*scale+j,x*scale+i] = [24,96,148]
+        # TODO you should write the img to a csv or smtg
+        # TODO you should somehow use showGridNew instead of copy pasting
+
+        S = 0
+        numParts = 0 # number of particles counted
+        nbead = len(self.beadShape) # number of px in a particle
+        for i in range(len(self.particleCenters)):
+            p = self.particleCenters[i]
+            # don't count particles that are too close to the edge
+            buffer = self.beadRad*2
+            if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
+               p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
+                continue
+            
+            numParts += 1
+
+            if self.usePsi6:
+                if self.psi6s[i] >= 0.98: # TODO or something
+                    nfree = len(self.snowflakeShape)
+                    S += np.log(nfree/nbead)
+                    continue
+
+            freePx = self.freeSpace(p)
+
+            # set all the free space px to red
+            for (x,y) in freePx:
+                for i in range(scale):
+                    for j in range(scale):
+                        imgArr[y*scale+j,x*scale+i] = [190,25,10]
+
+            nfree = len(freePx) # number of px available to move to
+            S += np.log(nfree/nbead)
+
+        toc = time.time()
+
+        img = PIL.Image.fromarray(imgArr,'RGB')
+        img.show()
+
+        return [S,numParts,toc-tic]
+
 
     def entropy(self):
         #print('--- sequential entropy')
