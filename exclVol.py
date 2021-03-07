@@ -90,7 +90,7 @@ class PolycrystalGrid:
         occupied = []
         for (x,y) in pxToCheck:
             # TODO tryin out exclusive
-            if dist((x0,y0),(x,y)) <= self.beadRad:
+            if dist((x0,y0),(x,y)) < self.beadRad:
                 occupied.append((x-x0,y-y0))
                 neighbors = self.getNeighbors((x,y))
                 for neighbor in neighbors:
