@@ -293,7 +293,7 @@ class PolycrystalGrid:
         plt.ylim(0,self.gridSize[1])
         plt.show()
 
-    def showAllFreeSpace(self,makeImg=False,imgFile=None,sbeadFile=None):
+    def entropy(self,makeImg=False,imgFile=None,sbeadFile=None):
         tic = time.time()
 
         # generate an Sbead file name, if none provided
@@ -364,8 +364,90 @@ class PolycrystalGrid:
 
         return [S,numParts,Sbead,toc-tic]
 
+    def NEWentropyParallel(self,numProc,makeImg=False,imgFile=None,sbeadFile=None):
+        tic = time.time()
 
-    def entropy(self):
+        # generate an Sbead file name, if none provided
+        i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
+        nameRoot = self.crystalFile[i+1:-4]
+        if sbeadFile == None:
+            sbeadFile = nameRoot+'_rad'+str(self.beadRad)+'_Sbead.csv'
+
+        if makeImg:
+            # generate an image name, if none provided
+            if imgFile == None:
+                imgFile = nameRoot+'_rad'+str(self.beadRad)+'_snowflakes.png'
+
+            # initialize a white grid
+            scale = 5
+            imgArr = np.ones((self.gridSize[1]*scale,self.gridSize[0]*scale,3),dtype=np.uint8) * 255
+
+            # set all the occupied px to blue
+            for (x,y) in self.occupiedPx:
+                for i in range(scale):
+                    for j in range(scale):
+                        imgArr[y*scale+j,x*scale+i] = [24,96,148]
+            # TODO you should write the img to a csv or smtg
+            # TODO you should somehow use showGridNew instead of copy pasting
+
+        S = 0 # total S
+        Sbead = [] # contribution to S from each bead
+
+        nbead = len(self.beadShape) # number of px in a particle
+
+        # pick out the particles to include in entropy calculation
+        particlesInGrid = []
+        buffer = self.beadRad*2
+        for p in self.particleCenters:
+            # don't count particles that are too close to the edge
+            if not(p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
+            p[1] < buffer or p[1] >= self.gridSize[1]-buffer):
+                particlesInGrid.append(p)
+        numParts = len(particlesInGrid)
+
+        with open(sbeadFile,'w',newline='') as sbeadFileObj:
+            writer = csv.writer(sbeadFileObj)
+
+            nbead = len(self.beadShape) # number of px in a particle
+            S = 0
+            Sbead = []
+
+            # get all snowflakes in parallel
+            pool = mp.Pool(numProc)
+            pool_results = [pool.apply_async(self.freeSpace,args=[p]) for p in particlesInGrid]
+            pool.close()
+            pool.join()
+
+            for r in pool_results:
+                freePx = r.get()
+                Si = np.log(len(freePx)/nbead)
+                S += Si
+                if self.usePsi6:
+                    psi6 = self.psi6dict[p]
+                    Sbead.append([Si,psi6])
+                    writer.writerow([Si,psi6])
+                else:
+                    Sbead.append(Si)
+                    writer.writerow([Si])
+
+                if makeImg:
+                    # set all the free space px to red
+                    for (x,y) in freePx:
+                        for i in range(scale):
+                            for j in range(scale):
+                                imgArr[y*scale+j,x*scale+i] = [190,25,10]
+
+        if makeImg:
+            # finally time to make & save our image!
+            img = PIL.Image.fromarray(imgArr,'RGB')
+            img.save(imgFile)
+
+        toc = time.time()
+
+        return [S,numParts,Sbead,toc-tic]
+
+
+    def OLDentropy(self):
         tic = time.time()
         S = 0
         numParts = 0 # number of particles counted
