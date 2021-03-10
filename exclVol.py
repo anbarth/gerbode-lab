@@ -25,7 +25,7 @@ class PolycrystalGrid:
 
         #self.resolution = resolution
         self.particleCenters = []
-        self.psi6s = []
+        self.psi6dict = {}
         self.occupiedPx = []
         self.exclShape = []
         self.beadShape = []
@@ -56,11 +56,11 @@ class PolycrystalGrid:
                     first = False
                     continue
                 # after the first line, it's particle centers all the way down
-                # TODO im about to implement psi6 stuff in a way that means the order of this list might now matter
-                self.particleCenters.append( (round( (float(row[0])-self.xmin)*resolution ),
-                                              round( (float(row[1])-self.ymin)*resolution )) )
-                if self.usePsi6: 
-                    self.psi6s.append(float(row[-1]))
+                p = (round( (float(row[0])-self.xmin)*resolution ), 
+                     round( (float(row[1])-self.ymin)*resolution ))
+                self.particleCenters.append(p)
+                if self.usePsi6:
+                    self.psi6dict[p] = float(row[-1])
                 
         # particles and exclused volumes always have the same shapes
         # so set those shapes once at the beginning and recycle them
@@ -137,13 +137,12 @@ class PolycrystalGrid:
     def setSnowflakeShape(self):
         # TODO anna you're in the middle of writing this fxn
         # when its done, try running testSimple and get entropy for annasCoolTest10.csv
-        for i in range(len(self.particleCenters)):
-            p = self.particleCenters[i]
+        for p in self.particleCenters:
             buffer = self.beadRad*2
             if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
                p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
                 continue
-            if self.psi6s[i] >= self.psi6cutoff:
+            if self.psi6dict[p] >= self.psi6cutoff:
                 freePx = self.freeSpace(p)
                 snowflake = [(x-p[0],y-p[1]) for (x,y) in freePx]
                 self.snowflakeShape = snowflake
@@ -249,28 +248,18 @@ class PolycrystalGrid:
         return True
 
     def freeSpace(self,particleCenter):
-        print('--------- free space ------------')
         particle = self.pxOccupiedByParticle(particleCenter) # particle includes all (x,y) to ignore
         freePx = []
         #pxToCheck = particle[:] # make a COPY!!!!
         pxToCheck = [particleCenter]
         for (x,y) in pxToCheck:
-            print('checking',(x,y))
             if self.isAvailableIgnore((x,y),particle):
                 freePx.append((x,y))
-                print('available!')
                 neighbors = self.getNeighbors((x,y))
                 for neighbor in neighbors:
                     if neighbor not in pxToCheck:
                         pxToCheck.append(neighbor)
-                print('pxToCheck:',pxToCheck)
         return freePx
-
-    def freeSpaceArea(self,particleCenter):
-        return len(self.freeSpace(particleCenter))
-
-    def freeSpaceAreaAndPsi6(self,i):
-        return (len(self.freeSpace(self.particleCenters[i])), self.psi6s[i] )
 
     def showFreeSpace(self,particleCenter):
         freePx = self.freeSpace(particleCenter)
@@ -304,7 +293,7 @@ class PolycrystalGrid:
         plt.ylim(0,self.gridSize[1])
         plt.show()
 
-    def showAllFreeSpace(self):
+    def showAllFreeSpace(self,makeImg=False):
 
         tic = time.time()
 
@@ -319,25 +308,22 @@ class PolycrystalGrid:
         # TODO you should write the img to a csv or smtg
         # TODO you should somehow use showGridNew instead of copy pasting
 
-        S = 0
+        S = 0 # total S
         numParts = 0 # number of particles counted
+        Sbead = [] # contribution to S from each bead
+
         nbead = len(self.beadShape) # number of px in a particle
+        buffer = self.beadRad*2
+
         for i in range(len(self.particleCenters)):
             p = self.particleCenters[i]
+
             # don't count particles that are too close to the edge
-            buffer = self.beadRad*2
             if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
                p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
                 continue
             
             numParts += 1
-
-            if self.usePsi6:
-                if self.psi6s[i] >= 0.98: # TODO or something
-                    nfree = len(self.snowflakeShape)
-                    S += np.log(nfree/nbead)
-                    continue
-
             freePx = self.freeSpace(p)
 
             # set all the free space px to red
@@ -346,8 +332,10 @@ class PolycrystalGrid:
                     for j in range(scale):
                         imgArr[y*scale+j,x*scale+i] = [190,25,10]
 
-            nfree = len(freePx) # number of px available to move to
-            S += np.log(nfree/nbead)
+
+            Si = np.log(len(freePx)/nbead)
+            S += Si
+            Sbead.append(Si)
 
         toc = time.time()
 
@@ -358,7 +346,6 @@ class PolycrystalGrid:
 
 
     def entropy(self):
-        #print('--- sequential entropy')
         tic = time.time()
         S = 0
         numParts = 0 # number of particles counted
