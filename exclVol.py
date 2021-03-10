@@ -89,8 +89,9 @@ class PolycrystalGrid:
         pxToCheck = [(x0,y0)]
         occupied = []
         for (x,y) in pxToCheck:
-            # TODO tryin out exclusive
-            if dist((x0,y0),(x,y)) < self.beadRad:
+            # TODO this should be either inclusive or exclusive idk
+            # been mostly using inclusive but i question myself :/
+            if dist((x0,y0),(x,y)) <= self.beadRad:
                 occupied.append((x-x0,y-y0))
                 neighbors = self.getNeighbors((x,y))
                 for neighbor in neighbors:
@@ -248,16 +249,21 @@ class PolycrystalGrid:
         return True
 
     def freeSpace(self,particleCenter):
+        print('--------- free space ------------')
         particle = self.pxOccupiedByParticle(particleCenter) # particle includes all (x,y) to ignore
         freePx = []
-        pxToCheck = particle[:] # make a COPY!!!!
+        #pxToCheck = particle[:] # make a COPY!!!!
+        pxToCheck = [particleCenter]
         for (x,y) in pxToCheck:
+            print('checking',(x,y))
             if self.isAvailableIgnore((x,y),particle):
                 freePx.append((x,y))
+                print('available!')
                 neighbors = self.getNeighbors((x,y))
                 for neighbor in neighbors:
                     if neighbor not in pxToCheck:
                         pxToCheck.append(neighbor)
+                print('pxToCheck:',pxToCheck)
         return freePx
 
     def freeSpaceArea(self,particleCenter):
