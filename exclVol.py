@@ -23,7 +23,7 @@ class PolycrystalGrid:
     # constructor takes the input csv file
     def __init__(self,fname,rad=0,usePsi6=False):
 
-        #self.resolution = resolution
+        self.crystalFile = fname
         self.particleCenters = []
         self.psi6dict = {}
         self.occupiedPx = []
@@ -172,7 +172,7 @@ class PolycrystalGrid:
             circ = plt.Circle((x, y), self.beadRad, color='gray', alpha=0.3)
             ax.add_artist(circ)
 
-        plt.scatter(*zip(*self.occupiedPx),marker='.',color='black')
+        plt.scatter(*zip(*self.occupiedPx),marker='.')
         plt.xlim(0,self.gridSize[0])
         plt.ylim(0,self.gridSize[1])
         #plt.xticks(np.arange(0, gridSize[0], step=1))
@@ -293,20 +293,31 @@ class PolycrystalGrid:
         plt.ylim(0,self.gridSize[1])
         plt.show()
 
-    def showAllFreeSpace(self,makeImg=False):
-
+    def showAllFreeSpace(self,makeImg=False,imgFile=None,sbeadFile=None):
         tic = time.time()
 
-        scale = 5
-        # initialize a white grid
-        imgArr = np.ones((self.gridSize[1]*scale,self.gridSize[0]*scale,3),dtype=np.uint8) * 255
-        # set all the occupied px to blue
-        for (x,y) in self.occupiedPx:
-            for i in range(scale):
-                for j in range(scale):
-                    imgArr[y*scale+j,x*scale+i] = [24,96,148]
-        # TODO you should write the img to a csv or smtg
-        # TODO you should somehow use showGridNew instead of copy pasting
+        # generate an Sbead file name, if none provided
+        i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
+        nameRoot = self.crystalFile[i+1:-4]
+        if sbeadFile == None:
+            sbeadFile = nameRoot+'_rad'+str(self.beadRad)+'_Sbead.csv'
+
+        if makeImg:
+            # generate an image name, if none provided
+            if imgFile == None:
+                imgFile = nameRoot+'_rad'+str(self.beadRad)+'_snowflakes.png'
+
+            # initialize a white grid
+            scale = 5
+            imgArr = np.ones((self.gridSize[1]*scale,self.gridSize[0]*scale,3),dtype=np.uint8) * 255
+
+            # set all the occupied px to blue
+            for (x,y) in self.occupiedPx:
+                for i in range(scale):
+                    for j in range(scale):
+                        imgArr[y*scale+j,x*scale+i] = [24,96,148]
+            # TODO you should write the img to a csv or smtg
+            # TODO you should somehow use showGridNew instead of copy pasting
 
         S = 0 # total S
         numParts = 0 # number of particles counted
@@ -315,34 +326,43 @@ class PolycrystalGrid:
         nbead = len(self.beadShape) # number of px in a particle
         buffer = self.beadRad*2
 
-        for i in range(len(self.particleCenters)):
-            p = self.particleCenters[i]
+        with open(sbeadFile,'w',newline='') as sbeadFileObj:
+            writer = csv.writer(sbeadFileObj)
 
-            # don't count particles that are too close to the edge
-            if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
-               p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
-                continue
-            
-            numParts += 1
-            freePx = self.freeSpace(p)
+            for p in self.particleCenters:
+                # don't count particles that are too close to the edge
+                if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
+                p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
+                    continue
+                
+                numParts += 1
+                freePx = self.freeSpace(p)
+                Si = np.log(len(freePx)/nbead)
+                S += Si
 
-            # set all the free space px to red
-            for (x,y) in freePx:
-                for i in range(scale):
-                    for j in range(scale):
-                        imgArr[y*scale+j,x*scale+i] = [190,25,10]
+                if self.usePsi6:
+                    psi6 = self.psi6dict[p]
+                    Sbead.append([Si,psi6])
+                    writer.writerow([Si,psi6])
+                else:
+                    Sbead.append(Si)
+                    writer.writerow([Si])
 
+                if makeImg:
+                    # set all the free space px to red
+                    for (x,y) in freePx:
+                        for i in range(scale):
+                            for j in range(scale):
+                                imgArr[y*scale+j,x*scale+i] = [190,25,10]
 
-            Si = np.log(len(freePx)/nbead)
-            S += Si
-            Sbead.append(Si)
+        if makeImg:
+            # finally time to make & save our image!
+            img = PIL.Image.fromarray(imgArr,'RGB')
+            img.save(imgFile)
 
         toc = time.time()
 
-        img = PIL.Image.fromarray(imgArr,'RGB')
-        img.show()
-
-        return [S,numParts,toc-tic]
+        return [S,numParts,Sbead,toc-tic]
 
 
     def entropy(self):
