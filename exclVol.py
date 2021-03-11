@@ -364,7 +364,7 @@ class PolycrystalGrid:
 
         return [S,numParts,Sbead,toc-tic]
 
-    def NEWentropyParallel(self,numProc,makeImg=False,imgFile=None,sbeadFile=None):
+    def entropyParallel(self,numProc,makeImg=False,imgFile=None,sbeadFile=None):
         tic = time.time()
 
         # generate an Sbead file name, if none provided
@@ -447,132 +447,7 @@ class PolycrystalGrid:
         return [S,numParts,Sbead,toc-tic]
 
 
-    def OLDentropy(self):
-        tic = time.time()
-        S = 0
-        numParts = 0 # number of particles counted
-        nbead = len(self.beadShape) # number of px in a particle
-        for i in range(len(self.particleCenters)):
-            p = self.particleCenters[i]
-            # don't count particles that are too close to the edge
-            buffer = self.beadRad*2
-            if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
-               p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
-                continue
-            
-            numParts += 1
-
-            if self.usePsi6:
-                if self.psi6s[i] >= 0.98: # TODO or something
-                    nfree = len(self.snowflakeShape)
-                    S += np.log(nfree/nbead)
-                    continue
-
-            nfree = len(self.freeSpace(p)) # number of px available to move to
-            S += np.log(nfree/nbead)
-
-        toc = time.time()
-        return [S,numParts,toc-tic]
-
-    def entropyHisto(self):
-        tic = time.time()
-        S = 0
-        Sbead = []
-        numParts = 0 # number of particles counted
-        nbead = len(self.beadShape) # number of px in a particle
-        for i in range(len(self.particleCenters)):
-            p = self.particleCenters[i]
-            # don't count particles that are too close to the edge
-            buffer = self.beadRad*2
-            if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
-               p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
-                continue
-            
-            numParts += 1
-
-            (nfree, psi6) = self.freeSpaceAreaAndPsi6(i) # number of px available to move to
-            Si = np.log(nfree/nbead)
-            S += Si
-            Sbead.append((Si,psi6))
-
-        toc = time.time()
-        return [S,Sbead,numParts,toc-tic]
-   
-    def entropyParallelHisto(self,numProc):
-        tic = time.time()
-        particlesInGrid = []
-
-        buffer = self.beadRad*2
-        for i in range(len(self.particleCenters)):
-            p = self.particleCenters[i]
-
-            if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
-               p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
-                continue
-
-            else:
-                particlesInGrid.append(i)
-        numParts = len(particlesInGrid) # number of particles counted
-        nbead = len(self.beadShape) # number of px in a particle
-        S = 0
-        Sbead = []
-
-        pool = mp.Pool(numProc)
-        pool_results = [pool.apply_async(self.freeSpaceAreaAndPsi6,args=[i]) for i in particlesInGrid]
-        pool.close()
-        pool.join()
-
-        for r in pool_results:
-            (nfree, psi6) = r.get()
-            Si = np.log(nfree/nbead)
-            S += Si
-            Sbead.append((Si,psi6))
-
-        toc = time.time()
-        return [S,Sbead,numParts,toc-tic]
-
-
-    def entropyParallel(self,numProc):
-        #print('--- parallel entropy')
-        tic = time.time()
-        particlesInGrid = []
-        shortcutParticles = 0
-        buffer = self.beadRad*2
-        for i in range(len(self.particleCenters)):
-            p = self.particleCenters[i]
-
-            if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
-               p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
-                continue
-            elif self.usePsi6 and self.psi6s[i] >= 0.98: # TODO or something
-                    shortcutParticles += 1
-                    continue
-            else:
-                particlesInGrid.append(p)
-        numParts = len(particlesInGrid) + shortcutParticles # number of particles counted
-        #print(numParts)
-        nbead = len(self.beadShape) # number of px in a particle
-        S = 0
-        Si = []
-
-        #with mp.Pool(10) as pool:
-        pool = mp.Pool(numProc)
-        pool_results = [pool.apply_async(self.freeSpaceArea,args=[p]) for p in particlesInGrid]
-        pool.close()
-        pool.join()
-        #pool_results = pool.imap_unordered(self.freeSpaceArea, particlesInGrid)
-        for r in pool_results:
-            nfree = r.get() # number of px available to move to
-            S += np.log(nfree/nbead)
-            Si.append(np.log(nfree/nbead))
-
-        # add in all the psi6 shortcut particles
-        if self.usePsi6:
-            S += shortcutParticles * np.log(len(self.snowflakeShape)/nbead)
-
-        toc = time.time()
-        return [S,numParts,toc-tic,Si]
-        
+    
 
     # counts possible configurations of particles in i_neighbors, the lazy way (ie treat each neighbor as if its independent of the others)
     # returns ln(total # configs)
