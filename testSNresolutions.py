@@ -6,8 +6,9 @@ import importlib
 importlib.reload(exclVol)
 
 if __name__ == '__main__':
-    radii = [16,18,20,22,24,26]
+    radii = [r for r in range(4,39)]
     with open('resolutionOscillationsForTinyCircles2.csv','w',newline='') as file:
+    #with open('readshock/readshock3_15.csv') as file:
         writer = csv.writer(file)
         writer.writerow(['filename','rad','S','N','S/N','runtime'])
         for crysfilename in ['tinyCircle1_8.csv','tinyCircle1_10.csv','tinyCircle2_8.csv','tinyCircle2_10.csv']:
