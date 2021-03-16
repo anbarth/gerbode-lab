@@ -423,7 +423,7 @@ class PolycrystalGrid:
             pool.join()
 
             for r in pool_results:
-                freePx = r.get()
+                freePx = r
                 Si = np.log(len(freePx)/nbead)
                 S += Si
                 if self.usePsi6:
