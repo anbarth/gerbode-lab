@@ -1,6 +1,7 @@
 import numpy as np
 import csv
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import time
 import bisect
 import random
@@ -386,7 +387,10 @@ class PolycrystalGrid:
             for (x,y) in self.occupiedPx:
                 for i in range(scale):
                     for j in range(scale):
-                        imgArr[y*scale+j,x*scale+i] = [24,96,148]
+                        #imgArr[y*scale+j,x*scale+i] = [24,96,148]
+                        imgArr[y*scale+j,x*scale+i] = [133,133,133]
+            
+            cmap = cm.get_cmap('viridis')
             # TODO you should write the img to a csv or smtg
             # TODO you should somehow use showGridNew instead of copy pasting
 
@@ -414,7 +418,7 @@ class PolycrystalGrid:
 
             # get all snowflakes in parallel
             pool = mp.Pool(numProc)
-            pool_results = [pool.apply_async(self.freeSpace,args=[p]) for p in particlesInGrid]
+            pool_results = [pool.apply(self.freeSpace,args=[p]) for p in particlesInGrid]
             pool.close()
             pool.join()
 
@@ -431,11 +435,13 @@ class PolycrystalGrid:
                     writer.writerow([Si])
 
                 if makeImg:
-                    # set all the free space px to red
+                    # set all the free space px to red... or something
+                    rgb = [ 255*v for v in cmap(len(freePx)/nbead*3.5)[0:3]]
                     for (x,y) in freePx:
                         for i in range(scale):
                             for j in range(scale):
-                                imgArr[y*scale+j,x*scale+i] = [190,25,10]
+                                imgArr[y*scale+j,x*scale+i] = rgb
+                                #imgArr[y*scale+j,x*scale+i] = [190,25,10]
 
         if makeImg:
             # finally time to make & save our image!
