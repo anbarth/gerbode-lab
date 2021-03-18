@@ -7,22 +7,20 @@ import os
 importlib.reload(exclVol)
 
 if __name__ == '__main__':
-    dir = r'C:\Users\GerbodeLab\Documents\banana\gerbode-lab\readshock2'
+    dir = r'C:\Users\GerbodeLab\Documents\banana\gerbode-lab\crystals\readshock2'
     #dir = r'C:\Users\GerbodeLab\Documents\banana\gerbode-lab\readshock'
-    for filename in os.listdir(dir):
-    #for filename in ['tinyCircle1_8.csv','tinyCircle1_10.csv','tinyCircle2_8.csv','tinyCircle2_10.csv']:
-        print("==================")
-        print(filename)
-        #coll = exclVol.PolycrystalGrid('readshock2/'+filename,resolution=35/5,usePsi6=True)
-        coll = exclVol.PolycrystalGrid(filename,rad=35,usePsi6=True)
-        print("n_bead: "+str(len(coll.beadShape)))
-        print("n_snow: "+str(len(coll.snowflakeShape)))
-        (S,Sbead,numParts,time) = coll.entropyParallelHisto(40)
-        print("time: "+str(time))
-        with open(filename[0:-4]+'_Sbead.csv','w',newline='') as file:
-            writer = csv.writer(file)
-            # first line: S_snowflake
-            writer.writerow([np.log( len(coll.snowflakeShape)/len(coll.beadShape) )])
-            # remaining lines: (S_i with NO shortcut,|psi6|)
-            for (Si,psi6) in Sbead:
-                writer.writerow([Si,psi6])
+    with open('readshock2_35px_excl_Entropiesmarch17.csv','w',newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['readshock2 data at 35px, see also associated images! this time EXCLUSIVE dist!'])
+        #writer.writerow(['readshock2 data at 5px, see also associated images!'])
+        writer.writerow(['file','S','N','S/N','time'])
+        for filename in os.listdir(dir):
+            print("==================")
+            print(filename)
+            coll = exclVol.PolycrystalGrid('crystals/readshock2/'+filename,rad=35,usePsi6=True)
+            #coll = exclVol.PolycrystalGrid(filename,rad=35)
+            print("n_bead: "+str(len(coll.beadShape)))
+            (S,numParts,Sbead,time) = coll.entropyParallel(40,makeImg=True)
+            print("time: "+str(time))
+            writer.writerow([filename,S,numParts,S/numParts])
+    
