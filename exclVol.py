@@ -92,7 +92,7 @@ class PolycrystalGrid:
         for (x,y) in pxToCheck:
             # TODO this should be either inclusive or exclusive idk
             # been mostly using inclusive but i question myself :/
-            if dist((x0,y0),(x,y)) <= self.beadRad:
+            if dist((x0,y0),(x,y)) < self.beadRad:
                 occupied.append((x-x0,y-y0))
                 neighbors = self.getNeighbors((x,y))
                 for neighbor in neighbors:
@@ -418,12 +418,12 @@ class PolycrystalGrid:
 
             # get all snowflakes in parallel
             pool = mp.Pool(numProc)
-            pool_results = [pool.apply(self.freeSpace,args=[p]) for p in particlesInGrid]
+            pool_results = [pool.apply_async(self.freeSpace,args=[p]) for p in particlesInGrid]
             pool.close()
             pool.join()
 
             for r in pool_results:
-                freePx = r
+                freePx = r.get()
                 Si = np.log(len(freePx)/nbead)
                 S += Si
                 if self.usePsi6:
