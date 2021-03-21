@@ -92,7 +92,7 @@ class PolycrystalGrid:
         for (x,y) in pxToCheck:
             # TODO this should be either inclusive or exclusive idk
             # been mostly using inclusive but i question myself :/
-            if dist((x0,y0),(x,y)) < self.beadRad:
+            if dist((x0,y0),(x,y)) <= self.beadRad:
                 occupied.append((x-x0,y-y0))
                 neighbors = self.getNeighbors((x,y))
                 for neighbor in neighbors:

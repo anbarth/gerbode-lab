@@ -6,15 +6,16 @@ import importlib
 importlib.reload(exclVol)
 
 if __name__ == '__main__':
-    radii = [r for r in range(4,31)]+[32,35,37,40]
+    radii = [r for r in range(4,9)]
     #with open('resolutionOscillationsForTinyCircles2.csv','w',newline='') as file:
-    with open('megaResolutionTestExclusive.csv','w',newline='') as file:
+    with open('resolutionTestExpanseMar21.csv','w',newline='') as file:
         writer = csv.writer(file)
-        writer.writerow('readshock/readshock3_15.csv')
+        writer.writerow(['readshock2/rs2p5_1.csv'])
+        writer.writerow(['inclusive dist. mar 21. trying to just see how runtimes on expanse look'])
         writer.writerow(['rad','S','N','S/N','runtime'])
 
         for radius in radii:
-            coll = exclVol.PolycrystalGrid('readshock/readshock3_15.csv',rad=radius,usePsi6=False)
+            coll = exclVol.PolycrystalGrid('crystals/readshock2/rs2p5_1.csv',rad=radius,usePsi6=False)
             print(coll.beadRad)
-            (S,numParts,time,Si) = coll.entropyParallel(40)
+            (S,numParts,Si,time) = coll.entropyParallel(40)
             writer.writerow([radius,S,numParts,S/numParts,time])
