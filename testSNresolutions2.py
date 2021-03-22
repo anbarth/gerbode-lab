@@ -6,7 +6,7 @@ import importlib
 importlib.reload(exclVol)
 
 if __name__ == '__main__':
-    radii = [r for r in range(4,9)]
+    radii = [r for r in range(4,41)]
     #with open('resolutionOscillationsForTinyCircles2.csv','w',newline='') as file:
     with open('resolutionTestExpanseMar21.csv','w',newline='') as file:
         writer = csv.writer(file)
