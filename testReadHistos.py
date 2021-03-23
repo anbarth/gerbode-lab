@@ -4,45 +4,30 @@ import matplotlib.pyplot as plt
 import exclVol
 import importlib
 import os
+import PIL
 importlib.reload(exclVol)
 
 
-cutoff = 0.98
-#dir = r'C:\Users\anna2\OneDrive\Documents\Gerbode\python\Sbead_data'
-with open('whySnowflakeBadTestNew.csv','w',newline='') as dataOut:
+dir = r'C:\Users\anna2\OneDrive\Documents\Gerbode\python\Sbeads\rs2_35px_excl_mar17'
+with open('deleteme.csv','w',newline='') as dataOut:
     writer = csv.writer(dataOut)
-    writer.writerow([cutoff])
-    writer.writerow(['file','Ntot','Nordered','avg(Sdiso)','avg(Sordered)','Ssnow','stddev(Sdiso)','stddev(Sord)','S/N_actual','S/N_cutoff'])
-    #for filename in os.listdir(dir):
-    for filename in ['tinyCircle1_8_Sbead.csv','tinyCircle1_10_Sbead.csv','tinyCircle2_8_Sbead.csv','tinyCircle2_10_Sbead.csv']:
-        print(filename)
-
+    #writer.writerow(['rs2 entropy values found mar 10 and 11. not necessarily the same as the last time i did it bc remember that little bug i fixed with how freespace starts out'])
+    #writer.writerow(['file','S','N','S/N'])
+    for filename in os.listdir(dir):
         Sbead = []
-        Sdiso = []
-        Sord = []
-        #with open('Sbead_data/'+filename) as file:
-        with open(filename) as file:
+        with open('Sbeads/rs2_35px_excl_mar17/'+filename) as file:
             reader = csv.reader(file)
-            Ssnow = float(next(reader)[0])
             for row in reader:
-                Sbead.append([float(row[0]),float(row[1])])
-        
-        for (S,psi6) in Sbead:
-            if psi6 >= cutoff:
-                Sord.append(S)
-            else:
-                Sdiso.append(S)
-        
-        Sactual = np.mean(Sdiso+Sord)
-        Scutoff = (len(Sdiso)*np.mean(Sdiso) + len(Sord)*Ssnow)/len(Sbead)
+                Sbead.append(float(row[0]))
 
+        S = np.mean(Sbead)
+        N = len(Sbead)
 
-        writer.writerow([filename,len(Sbead),len(Sord), \
-                        np.mean(Sdiso),np.mean(Sord), Ssnow, \
-                        np.std(Sdiso),np.std(Sord), Sactual, Scutoff])
-        
+        #writer.writerow([filename,S,N,S/N])
+
         plt.clf()
-        #plt.hist(Sord)
-        plt.hist(np.array([Sdiso,Sord],dtype=object),stacked=True)
-        #plt.vlines(Ssnow,0,50)
-        plt.savefig(filename[0:-4]+'_histo.png')
+        plt.hist(Sbead,bins=40)
+        plt.vlines(S,0,50)
+        plt.xlim(-4.5,-1)
+        plt.ylim(0,170)
+        plt.savefig(filename[0:-4]+'_35px_EXCL_histo.png')

@@ -9,6 +9,7 @@ import operator
 import os
 import multiprocessing as mp
 import PIL
+from matplotlib import path
 
 class PolycrystalGrid:
     # class fields:
@@ -22,7 +23,7 @@ class PolycrystalGrid:
     #   psi6: does the file contain psi6 magnitude data?
 
     # constructor takes the input csv file
-    def __init__(self,fname,rad=0,usePsi6=False):
+    def __init__(self,fname,rad=0,usePsi6=False,useNeighbs=False):
 
         self.crystalFile = fname
         self.particleCenters = []
@@ -33,6 +34,8 @@ class PolycrystalGrid:
         self.snowflakeShape = []
         self.usePsi6 = usePsi6
         self.psi6cutoff = 0.98
+        self.useNeighbs = useNeighbs
+        self.neighbs = {}
 
 
         # read in particle centers (and optionally, |psi6|) from csv
@@ -75,6 +78,31 @@ class PolycrystalGrid:
 
         if self.usePsi6:
             self.setSnowflakeShape()
+
+        if self.useNeighbs:
+            # read in neighbors
+            i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
+            nameRoot = self.crystalFile[i+1:-4]
+            neighbFile = "crysNeighbs/"+nameRoot+"_neighbs.csv"
+            with open(neighbFile) as csvFile:
+                reader = csv.reader(csvFile, delimiter=',')
+                for row in reader:
+                    # first element gives the particles whomst neighbors we will see
+                    partID = int(row[0])-1
+                    p = self.particleCenters[partID]
+                    
+                    # subsequent elements are that particle's neighbors
+                    myNeighbs = []
+                    for i in range(1,len(row)):
+                        myNeighbs.append(self.particleCenters[int(row[i])-1])
+
+                    self.neighbs[p] = myNeighbs
+
+
+    def polygonAt(self,p):
+        N = 10 # jus for now
+        delta = 2*np.pi/N
+        return [ ( p[0]+self.beadRad*np.cos(n*delta), p[1]+self.beadRad*np.sin(n*delta) ) for n in range(N) ]
 
     # sets the shape of a particle centered at (0,0), so you can translate it to any other position
     # ^ that's what pxOccupiedByParticle does
@@ -181,6 +209,22 @@ class PolycrystalGrid:
         #plt.grid(b=True,which='both',axis='both')
         plt.show()
 
+
+    def showNeighbors(self,p):
+        fig, ax = plt.subplots()
+        for (x,y) in self.particleCenters:
+            circ = plt.Circle((x, y), self.beadRad, color='gray', alpha=0.3)
+            ax.add_artist(circ)
+
+        for (x,y) in self.neighbs[p]:
+            xvals = [x,p[0]]
+            yvals = [y,p[1]]
+            plt.plot(xvals,yvals,color='green')
+        plt.scatter(*zip(*self.occupiedPx),marker='.')
+        plt.xlim(0,self.gridSize[0])
+        plt.ylim(0,self.gridSize[1])
+        plt.show()
+
     def showGridNew(self):
         scale = 5
         # initialize a white grid
@@ -251,7 +295,6 @@ class PolycrystalGrid:
     def freeSpace(self,particleCenter):
         particle = self.pxOccupiedByParticle(particleCenter) # particle includes all (x,y) to ignore
         freePx = []
-        #pxToCheck = particle[:] # make a COPY!!!!
         pxToCheck = [particleCenter]
         for (x,y) in pxToCheck:
             if self.isAvailableIgnore((x,y),particle):
@@ -261,6 +304,49 @@ class PolycrystalGrid:
                     if neighbor not in pxToCheck:
                         pxToCheck.append(neighbor)
         return freePx
+
+    def isAvailPoly(self,oldCenter,newCenter):
+        nns = self.neighbs[oldCenter]
+        newPolyPath = path.Path(self.polygonAt(newCenter))
+        # loops over nearest neighbors
+        for nn in nns:
+            neighbPoly = self.polygonAt(nn)
+            # if they overlap, this spot is not available
+            overlapPts = newPolyPath.contains_points(neighbPoly)
+            if any(overlapPts):
+                return False
+        # made it through all the neighbors? you're good to go
+        return True
+
+
+    def freeSpacePoly(self,particleCenter):
+        freePx = []
+        pxToCheck = [particleCenter]
+        for (x,y) in pxToCheck:
+            if self.isAvailPoly(particleCenter,(x,y)):
+                freePx.append((x,y))
+                neighbors = self.getNeighbors((x,y))
+                for neighbor in neighbors:
+                    if neighbor not in pxToCheck:
+                        pxToCheck.append(neighbor)
+        return freePx
+
+
+
+    def showFreeSpacePoly(self,particleCenter):
+        freePx = self.freeSpacePoly(particleCenter)
+
+        # lots of copied-pasted from showGrid lol
+        fig, ax = plt.subplots()
+        for (x,y) in self.particleCenters:
+            circ = plt.Circle((x, y), self.beadRad, color='gray', alpha=0.3)
+            ax.add_artist(circ)
+
+        plt.scatter(*zip(*self.occupiedPx),marker='.')
+        plt.scatter(*zip(*freePx),marker='.',color='red')
+        plt.xlim(0,self.gridSize[0])
+        plt.ylim(0,self.gridSize[1])
+        plt.show()
 
     def showFreeSpace(self,particleCenter):
         freePx = self.freeSpace(particleCenter)
