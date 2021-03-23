@@ -22,7 +22,7 @@ class PolycrystalGrid:
     #   psi6: does the file contain psi6 magnitude data?
 
     # constructor takes the input csv file
-    def __init__(self,fname,rad=0,usePsi6=False):
+    def __init__(self,fname,rad=0,usePsi6=False,useNeighbs=False):
 
         self.crystalFile = fname
         self.particleCenters = []
@@ -33,6 +33,8 @@ class PolycrystalGrid:
         self.snowflakeShape = []
         self.usePsi6 = usePsi6
         self.psi6cutoff = 0.98
+        self.useNeighbs = useNeighbs
+        self.neighbs = {}
 
 
         # read in particle centers (and optionally, |psi6|) from csv
@@ -75,6 +77,26 @@ class PolycrystalGrid:
 
         if self.usePsi6:
             self.setSnowflakeShape()
+
+        if self.useNeighbs:
+            # read in neighbors
+            i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
+            nameRoot = self.crystalFile[i+1:-4]
+            neighbFile = "crysNeighbs/"+nameRoot+"_neighbs.csv"
+            with open(neighbFile) as csvFile:
+                reader = csv.reader(csvFile, delimiter=',')
+                for row in reader:
+                    # first element gives the particles whomst neighbors we will see
+                    partID = int(row[0])-1
+                    p = self.particleCenters[partID]
+                    
+                    # subsequent elements are that particle's neighbors
+                    myNeighbs = []
+                    for i in range(1,len(row)):
+                        myNeighbs.append(self.particleCenters[int(row[i])-1])
+
+                    self.neighbs[p] = myNeighbs
+
 
     # sets the shape of a particle centered at (0,0), so you can translate it to any other position
     # ^ that's what pxOccupiedByParticle does
@@ -179,6 +201,22 @@ class PolycrystalGrid:
         #plt.xticks(np.arange(0, gridSize[0], step=1))
         #plt.yticks(np.arange(0, gridSize[1], step=1))
         #plt.grid(b=True,which='both',axis='both')
+        plt.show()
+
+
+    def showNeighbors(self,p):
+        fig, ax = plt.subplots()
+        for (x,y) in self.particleCenters:
+            circ = plt.Circle((x, y), self.beadRad, color='gray', alpha=0.3)
+            ax.add_artist(circ)
+
+        for (x,y) in self.neighbs[p]:
+            xvals = [x,p[0]]
+            yvals = [y,p[1]]
+            plt.plot(xvals,yvals,color='green')
+        plt.scatter(*zip(*self.occupiedPx),marker='.')
+        plt.xlim(0,self.gridSize[0])
+        plt.ylim(0,self.gridSize[1])
         plt.show()
 
     def showGridNew(self):
