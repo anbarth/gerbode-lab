@@ -100,7 +100,8 @@ class PolycrystalGrid:
 
 
     def polygonAt(self,p):
-        N = 10 # jus for now
+        # pick an N st the sidelength of an N-gon is ~= the length of a pixel
+        N = int(np.ceil(2*np.pi*self.beadRad))
         delta = 2*np.pi/N
         return [ ( p[0]+self.beadRad*np.cos(n*delta), p[1]+self.beadRad*np.sin(n*delta) ) for n in range(N) ]
 
@@ -219,7 +220,7 @@ class PolycrystalGrid:
         for (x,y) in self.neighbs[p]:
             xvals = [x,p[0]]
             yvals = [y,p[1]]
-            plt.plot(xvals,yvals,color='green')
+            plt.plot(xvals,yvals,color='black')
         plt.scatter(*zip(*self.occupiedPx),marker='.')
         plt.xlim(0,self.gridSize[0])
         plt.ylim(0,self.gridSize[1])
@@ -306,6 +307,10 @@ class PolycrystalGrid:
         return freePx
 
     def isAvailPoly(self,oldCenter,newCenter):
+        # particle can always exist in the spot it originally is
+        # we need to specify this bc the crystal might actually have some stupid little bits over overlap
+        if oldCenter == newCenter:
+            return True
         nns = self.neighbs[oldCenter]
         newPolyPath = path.Path(self.polygonAt(newCenter))
         # loops over nearest neighbors
@@ -380,7 +385,8 @@ class PolycrystalGrid:
         plt.ylim(0,self.gridSize[1])
         plt.show()
 
-    def entropy(self,makeImg=False,imgFile=None,sbeadFile=None):
+
+    def entropy(self,makeImg=False,imgFile=None,sbeadFile=None,poly=False):
         tic = time.time()
 
         # generate an Sbead file name, if none provided
@@ -423,7 +429,17 @@ class PolycrystalGrid:
                     continue
                 
                 numParts += 1
-                freePx = self.freeSpace(p)
+
+                #print("finding freepx for particle at",p)
+                freePx = []
+                if poly:
+                    freePx = self.freeSpacePoly(p)
+                else:
+                    freePx = self.freeSpace(p)
+                
+                if len(freePx)==0:
+                    print("no freepx for ",p)
+
                 Si = np.log(len(freePx)/nbead)
                 S += Si
 
