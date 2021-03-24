@@ -467,19 +467,24 @@ class PolycrystalGrid:
 
         return [S,numParts,Sbead,toc-tic]
 
-    def entropyParallel(self,numProc,makeImg=False,imgFile=None,sbeadFile=None):
+    def entropyParallel(self,numProc,makeImg=False,imgFile=None,sbeadFile=None,poly=False):
         tic = time.time()
 
         # generate an Sbead file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
         nameRoot = self.crystalFile[i+1:-4]
+        if poly:
+            polyStr = '_poly'
+        else:
+            polyStr = '_old'
+            
         if sbeadFile == None:
-            sbeadFile = nameRoot+'_rad'+str(self.beadRad)+'_Sbead.csv'
+            sbeadFile = nameRoot+'_rad'+str(self.beadRad)+polyStr+'_Sbead.csv'
 
         if makeImg:
             # generate an image name, if none provided
             if imgFile == None:
-                imgFile = nameRoot+'_rad'+str(self.beadRad)+'_snowflakes.png'
+                imgFile = nameRoot+'_rad'+str(self.beadRad)+polyStr+'_snowflakes.png'
 
             # initialize a white grid
             scale = 5
@@ -519,8 +524,14 @@ class PolycrystalGrid:
             Sbead = []
 
             # get all snowflakes in parallel
-            pool = mp.Pool(numProc)
-            pool_results = [pool.apply_async(self.freeSpace,args=[p]) for p in particlesInGrid]
+            pool = mp.Pool(numProc)  
+
+            pool_results = []
+            if poly:
+                pool_results = [pool.apply_async(self.freeSpacePoly,args=[p]) for p in particlesInGrid]
+            else:
+                pool_results = [pool.apply_async(self.freeSpace,args=[p]) for p in particlesInGrid]
+
             pool.close()
             pool.join()
 

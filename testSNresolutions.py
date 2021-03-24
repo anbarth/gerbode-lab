@@ -6,26 +6,19 @@ import importlib
 importlib.reload(exclVol)
 
 if __name__ == '__main__':
-    radii = [r for r in range(4,39)]
-    with open('resolutionOscillationsForTinyCircles2.csv','w',newline='') as file:
-    #with open('readshock/readshock3_15.csv') as file:
+    radii = [5,10,15,20,25,30,35]
+    with open('freeSpaceOldVsPolyMar23.csv','w',newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['filename','rad','S','N','S/N','runtime'])
-        for crysfilename in ['tinyCircle1_8.csv','tinyCircle1_10.csv','tinyCircle2_8.csv','tinyCircle2_10.csv']:
-            print(crysfilename)
-
-            for radius in radii:
-                coll = exclVol.PolycrystalGrid(crysfilename,rad=radius,usePsi6=True)
-                print(coll.beadRad)
-                (S,Sbead,numParts,time) = coll.entropyParallelHisto(40)
-
-                with open(crysfilename[0:-4]+'_'+str(radius)+'_Sbead.csv','w',newline='') as sbeadfile:
-                    writer2 = csv.writer(sbeadfile)
-                    # first line: S_snowflake
-                    writer2.writerow([np.log( len(coll.snowflakeShape)/len(coll.beadShape) )])
-                    # remaining lines: (S_i with NO shortcut,|psi6|)
-                    for (Si,psi6) in Sbead:
-                        writer2.writerow([Si,psi6])
-
-                #[S2, N2, runtime2] = coll.entropyParallel()
-                writer.writerow([crysfilename,radius,S,numParts,S/numParts,time])
+        crysfilename = 'crystals/tinyCircle1_8.csv'
+        writer.writerow([crysfilename])
+        writer.writerow(['looking for differences bw old freespace (inclusive dist) and freespacepoly, both in terms of runtime and S value'])
+        writer.writerow(['rad','N','S_old','runtime','S_poly','runtime'])
+        
+        for radius in radii:
+            coll = exclVol.PolycrystalGrid(crysfilename,rad=radius,useNeighbs=True)
+            print(coll.beadRad)
+            (Sold,N1,Sbead1,told) =   coll.entropyParallel(40,makeImg=True,poly=False)
+            (Spoly,N2,Sbead2,tpoly) = coll.entropyParallel(40,makeImg=True,poly=True)
+            print(N1==N2) # true probly
+            print(radius,N1,Sold,told,Spoly,tpoly)
+            writer.writerow([radius,N1,Sold,told,Spoly,tpoly])
