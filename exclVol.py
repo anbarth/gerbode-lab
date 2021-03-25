@@ -81,7 +81,7 @@ class PolycrystalGrid:
 
         if self.useNeighbs:
             # read in neighbors
-            i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
+            i = self.crystalFile.find('/') # chop off any part of the name before a slash
             nameRoot = self.crystalFile[i+1:-4]
             neighbFile = "crysNeighbs/"+nameRoot+"_neighbs.csv"
             with open(neighbFile) as csvFile:
