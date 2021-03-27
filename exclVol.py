@@ -165,15 +165,15 @@ class PolycrystalGrid:
     # in the future i'd like to be able to just look up a particle like this automatically, ie look for max psi6
     # or the average |psi6| among particles below the cutoff
     def setSnowflakeShape(self):
-        # TODO anna you're in the middle of writing this fxn
         # when its done, try running testSimple and get entropy for annasCoolTest10.csv
-        for p in self.particleCenters:
+        for i in range(len(self.particleCenters)):
             buffer = self.beadRad*2
+            p = self.particleCenters[i]
             if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
                p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
                 continue
             if self.psi6dict[p] >= self.psi6cutoff:
-                freePx = self.freeSpace(p)
+                [pID,freePx] = self.freeSpace(i)
                 snowflake = [(x-p[0],y-p[1]) for (x,y) in freePx]
                 self.snowflakeShape = snowflake
                 return snowflake
@@ -293,7 +293,8 @@ class PolycrystalGrid:
                     return False
         return True
 
-    def freeSpace(self,particleCenter):
+    def freeSpace(self,particleID):
+        particleCenter = self.particleCenters[particleID]
         particle = self.pxOccupiedByParticle(particleCenter) # particle includes all (x,y) to ignore
         freePx = []
         pxToCheck = [particleCenter]
@@ -304,7 +305,7 @@ class PolycrystalGrid:
                 for neighbor in neighbors:
                     if neighbor not in pxToCheck:
                         pxToCheck.append(neighbor)
-        return freePx
+        return [particleID,freePx]
 
     def isAvailPoly(self,oldCenter,newCenter):
         # particle can always exist in the spot it originally is
@@ -324,9 +325,10 @@ class PolycrystalGrid:
         return True
 
 
-    def freeSpacePoly(self,particleCenter):
-        freePx = []
+    def freeSpacePoly(self,particleID):
+        particleCenter = self.particleCenters[particleID]
         pxToCheck = [particleCenter]
+        freePx = []
         for (x,y) in pxToCheck:
             if self.isAvailPoly(particleCenter,(x,y)):
                 freePx.append((x,y))
@@ -334,12 +336,12 @@ class PolycrystalGrid:
                 for neighbor in neighbors:
                     if neighbor not in pxToCheck:
                         pxToCheck.append(neighbor)
-        return freePx
+        return [particleID,freePx]
 
 
 
-    def showFreeSpacePoly(self,particleCenter):
-        freePx = self.freeSpacePoly(particleCenter)
+    def showFreeSpacePoly(self,particleID):
+        [pID, freePx] = self.freeSpacePoly(particleID)
 
         # lots of copied-pasted from showGrid lol
         fig, ax = plt.subplots()
@@ -353,8 +355,8 @@ class PolycrystalGrid:
         plt.ylim(0,self.gridSize[1])
         plt.show()
 
-    def showFreeSpace(self,particleCenter):
-        freePx = self.freeSpace(particleCenter)
+    def showFreeSpace(self,particleID):
+        [pID, freePx] = self.freeSpace(particleID)
 
         # lots of copied-pasted from showGrid lol
         fig, ax = plt.subplots()
@@ -422,8 +424,9 @@ class PolycrystalGrid:
         with open(sbeadFile,'w',newline='') as sbeadFileObj:
             writer = csv.writer(sbeadFileObj)
 
-            for p in self.particleCenters:
+            for i in range(len(self.particleCenters)):
                 # don't count particles that are too close to the edge
+                p = self.particleCenters[i]
                 if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
                 p[1] < buffer or p[1] >= self.gridSize[1]-buffer:
                     continue
@@ -431,14 +434,11 @@ class PolycrystalGrid:
                 numParts += 1
 
                 #print("finding freepx for particle at",p)
-                freePx = []
+                #freePx = []
                 if poly:
-                    freePx = self.freeSpacePoly(p)
+                    [pID, freePx] = self.freeSpacePoly(i)
                 else:
-                    freePx = self.freeSpace(p)
-                
-                if len(freePx)==0:
-                    print("no freepx for ",p)
+                    [pID, freePx] = self.freeSpace(i)
 
                 Si = np.log(len(freePx)/nbead)
                 S += Si
@@ -509,8 +509,9 @@ class PolycrystalGrid:
         # pick out the particles to include in entropy calculation
         particlesInGrid = []
         buffer = self.beadRad*2
-        for p in self.particleCenters:
+        for i in range(len(self.particleCenters)):
             # don't count particles that are too close to the edge
+            p = self.particleCenters(i)
             if not(p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
             p[1] < buffer or p[1] >= self.gridSize[1]-buffer):
                 particlesInGrid.append(p)
@@ -528,15 +529,15 @@ class PolycrystalGrid:
 
             pool_results = []
             if poly:
-                pool_results = [pool.apply_async(self.freeSpacePoly,args=[p]) for p in particlesInGrid]
+                pool_results = [pool.apply_async(self.freeSpacePoly,args=[i]) for i in range(len(self.particleCenters))]
             else:
-                pool_results = [pool.apply_async(self.freeSpace,args=[p]) for p in particlesInGrid]
+                pool_results = [pool.apply_async(self.freeSpace,args=[i]) for i in range(len(self.particleCenters))]
 
             pool.close()
             pool.join()
 
             for r in pool_results:
-                freePx = r.get()
+                freePx = r.get()[1]
                 Si = np.log(len(freePx)/nbead)
                 S += Si
                 if self.usePsi6:
@@ -575,8 +576,7 @@ class PolycrystalGrid:
         ln_configs = 0
 
         for i in i_neighbors:
-            p = self.particleCenters[i]
-            space = self.freeSpace(p)
+            space = self.freeSpace(i)[1]
             V = len(space)
             ln_configs += np.log(V)
         toc = time.time()
