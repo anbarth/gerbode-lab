@@ -416,7 +416,6 @@ class PolycrystalGrid:
 
         S = 0 # total S
         numParts = 0 # number of particles counted
-        Sbead = [] # contribution to S from each bead
 
         nbead = len(self.beadShape) # number of px in a particle
         buffer = self.beadRad*2
@@ -445,11 +444,9 @@ class PolycrystalGrid:
 
                 if self.usePsi6:
                     psi6 = self.psi6dict[p]
-                    Sbead.append([Si,psi6])
-                    writer.writerow([Si,psi6])
+                    writer.writerow([pID,Si,psi6])
                 else:
-                    Sbead.append(Si)
-                    writer.writerow([Si])
+                    writer.writerow([pID,Si])
 
                 if makeImg:
                     # set all the free space px to red
@@ -465,7 +462,7 @@ class PolycrystalGrid:
 
         toc = time.time()
 
-        return [S,numParts,Sbead,toc-tic]
+        return [S,numParts,toc-tic]
 
     def entropyParallel(self,numProc,makeImg=False,imgFile=None,sbeadFile=None,poly=False):
         tic = time.time()
@@ -502,8 +499,6 @@ class PolycrystalGrid:
             # TODO you should somehow use showGridNew instead of copy pasting
 
         S = 0 # total S
-        Sbead = [] # contribution to S from each bead
-
         nbead = len(self.beadShape) # number of px in a particle
 
         # pick out the particles to include in entropy calculation
@@ -520,10 +515,6 @@ class PolycrystalGrid:
         with open(sbeadFile,'w',newline='') as sbeadFileObj:
             writer = csv.writer(sbeadFileObj)
 
-            nbead = len(self.beadShape) # number of px in a particle
-            S = 0
-            Sbead = []
-
             # get all snowflakes in parallel
             pool = mp.Pool(numProc)  
 
@@ -537,16 +528,14 @@ class PolycrystalGrid:
             pool.join()
 
             for r in pool_results:
-                freePx = r.get()[1]
+                [pID,freePx] = r.get()
                 Si = np.log(len(freePx)/nbead)
                 S += Si
                 if self.usePsi6:
                     psi6 = self.psi6dict[p]
-                    Sbead.append([Si,psi6])
-                    writer.writerow([Si,psi6])
+                    writer.writerow([pID,Si,psi6])
                 else:
-                    Sbead.append(Si)
-                    writer.writerow([Si])
+                    writer.writerow([pID,Si])
 
                 if makeImg:
                     # set all the free space px to red... or something
@@ -564,7 +553,7 @@ class PolycrystalGrid:
 
         toc = time.time()
 
-        return [S,numParts,Sbead,toc-tic]
+        return [S,numParts,toc-tic]
 
 
     
