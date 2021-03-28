@@ -313,22 +313,22 @@ class PolycrystalGrid:
         if oldCenter == newCenter:
             return True
         nns = self.neighbs[oldCenter]
-        #newPolyPath = path.Path(self.polygonAt(newCenter))
+        newPolyPath = path.Path(self.polygonAt(newCenter))
         # loops over nearest neighbors
         for nn in nns:
             neighbPoly = self.polygonAt(nn)
             
             # if any (x,y) in neighbPoly is within a beadRad of newCenter, newCenter is NOT available
-            for (x,y) in neighbPoly:
+            '''for (x,y) in neighbPoly:
                 dx = x-newCenter[0]
                 dy = y-newCenter[1]
                 if dx*dx + dy*dy < self.beadRad*self.beadRad:
-                    return False
+                    return False'''
 
             # if they overlap, this spot is not available
-            #overlapPts = newPolyPath.contains_points(neighbPoly)
-            #if any(overlapPts):
-            #    return False
+            overlapPts = newPolyPath.contains_points(neighbPoly)
+            if any(overlapPts):
+                return False
         # made it through all the neighbors? you're good to go
         return True
 
@@ -556,7 +556,7 @@ class PolycrystalGrid:
         buffer = self.beadRad*2
         for i in range(len(self.particleCenters)):
             # don't count particles that are too close to the edge
-            p = self.particleCenters(i)
+            p = self.particleCenters[i]
             if not(p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
             p[1] < buffer or p[1] >= self.gridSize[1]-buffer):
                 particlesInGrid.append(p)
