@@ -318,6 +318,7 @@ class PolycrystalGrid:
         for nn in nns:
             neighbPoly = self.polygonAt(nn)
             # if they overlap, this spot is not available
+            # TODO what is this contains_points nonsense? its a circle. just check urself lol
             overlapPts = newPolyPath.contains_points(neighbPoly)
             if any(overlapPts):
                 return False
@@ -337,6 +338,35 @@ class PolycrystalGrid:
                     if neighbor not in pxToCheck:
                         pxToCheck.append(neighbor)
         return [particleID,freePx]
+
+    def freeSpaceMC(self,particleID):
+        particleCenter = self.particleCenters[particleID]
+
+        # randomly guess points within 1 diameter = 2 beadRad of particleCenter
+        maxTrials = 500
+        numTrials = 0
+        freePts = []
+        while numTrials < maxTrials:
+            # x0 and y0 are in [-2beadRad,+2beadRad)
+            x0 = random.random()*4*self.beadRad - 2*self.beadRad
+            y0 = random.random()*4*self.beadRad - 2*self.beadRad
+            # reject points that are not in the circle (excluding boundary but idt it matters)
+            if x0*x0 + y0*y0 >= 4*self.beadRad*self.beadRad:
+                continue
+
+            numTrials += 1
+            x = x0 + particleCenter[0]
+            y = y0 + particleCenter[1]
+            if self.isAvailPoly(particleCenter,(x,y)):
+                freePts.append((x,y))
+        # bead area = pi r^2 = 1
+        # sampling circle area = pi (2r)^2 = 4 pi r^2 = 4
+        # free area = len(freePts)/numTrials * sampling circle area
+        #           = 4 * len(freePts)/numTrials
+        freeArea = 4*len(freePts)/maxTrials
+        if freeArea == 0:
+            freeArea = 4/maxTrials
+        return [particleID,freePts,freeArea]
 
 
 
@@ -387,8 +417,8 @@ class PolycrystalGrid:
         plt.ylim(0,self.gridSize[1])
         plt.show()
 
-
-    def entropy(self,makeImg=False,imgFile=None,sbeadFile=None,poly=False):
+    # method options: 1) old px-by-px method; 2) polygons method; 3) MC
+    def entropy(self,makeImg=False,imgFile=None,sbeadFile=None,method=1):
         tic = time.time()
 
         # generate an Sbead file name, if none provided
@@ -424,6 +454,7 @@ class PolycrystalGrid:
             writer = csv.writer(sbeadFileObj)
 
             for i in range(len(self.particleCenters)):
+                print(i/len(self.particleCenters))
                 # don't count particles that are too close to the edge
                 p = self.particleCenters[i]
                 if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
@@ -434,12 +465,18 @@ class PolycrystalGrid:
 
                 #print("finding freepx for particle at",p)
                 #freePx = []
-                if poly:
+                if method==1:
                     [pID, freePx] = self.freeSpacePoly(i)
-                else:
+                    Si = np.log(len(freePx)/nbead)
+                elif method==2:
                     [pID, freePx] = self.freeSpace(i)
+                    Si = np.log(len(freePx)/nbead)
+                elif method==3:
+                    # the second thing returned is rly freePts, a random sampling of the free area
+                    # but i am naming it freePx bc i wanna draw it
+                    [pID, freePx, freeArea] = self.freeSpaceMC(i)
+                    Si = np.log(freeArea)
 
-                Si = np.log(len(freePx)/nbead)
                 S += Si
 
                 if self.usePsi6:
@@ -450,10 +487,16 @@ class PolycrystalGrid:
 
                 if makeImg:
                     # set all the free space px to red
-                    for (x,y) in freePx:
-                        for i in range(scale):
-                            for j in range(scale):
-                                imgArr[y*scale+j,x*scale+i] = [190,25,10]
+                    if method == 1 or method == 2:
+                        for (x,y) in freePx:
+                            for i in range(scale):
+                                for j in range(scale):
+                                    imgArr[y*scale+j,x*scale+i] = [190,25,10]
+                    elif method == 3:
+                        for (x,y) in freePx:
+                            for i in range(scale):
+                                for j in range(scale):
+                                    imgArr[int(y*scale+j),int(x*scale+i)] = [0,0,0]
 
         if makeImg:
             # finally time to make & save our image!
