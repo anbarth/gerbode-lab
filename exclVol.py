@@ -461,7 +461,6 @@ class PolycrystalGrid:
             writer = csv.writer(sbeadFileObj)
 
             for i in range(len(self.particleCenters)):
-                print(i/len(self.particleCenters))
                 # don't count particles that are too close to the edge
                 p = self.particleCenters[i]
                 if p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
@@ -559,7 +558,7 @@ class PolycrystalGrid:
             p = self.particleCenters[i]
             if not(p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
             p[1] < buffer or p[1] >= self.gridSize[1]-buffer):
-                particlesInGrid.append(p)
+                particlesInGrid.append(i)
         numParts = len(particlesInGrid)
 
         with open(sbeadFile,'w',newline='') as sbeadFileObj:
@@ -570,9 +569,9 @@ class PolycrystalGrid:
 
             pool_results = []
             if poly:
-                pool_results = [pool.apply_async(self.freeSpacePoly,args=[i]) for i in range(len(self.particleCenters))]
+                pool_results = [pool.apply_async(self.freeSpacePoly,args=[i]) for i in particlesInGrid]
             else:
-                pool_results = [pool.apply_async(self.freeSpace,args=[i]) for i in range(len(self.particleCenters))]
+                pool_results = [pool.apply_async(self.freeSpace,args=[i]) for i in particlesInGrid]
 
             pool.close()
             pool.join()
