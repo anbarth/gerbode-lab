@@ -313,15 +313,22 @@ class PolycrystalGrid:
         if oldCenter == newCenter:
             return True
         nns = self.neighbs[oldCenter]
-        newPolyPath = path.Path(self.polygonAt(newCenter))
+        #newPolyPath = path.Path(self.polygonAt(newCenter))
         # loops over nearest neighbors
         for nn in nns:
             neighbPoly = self.polygonAt(nn)
+            
+            # if any (x,y) in neighbPoly is within a beadRad of newCenter, newCenter is NOT available
+            for (x,y) in neighbPoly:
+                dx = x-newCenter[0]
+                dy = y-newCenter[1]
+                if dx*dx + dy*dy < self.beadRad*self.beadRad:
+                    return False
+
             # if they overlap, this spot is not available
-            # TODO what is this contains_points nonsense? its a circle. just check urself lol
-            overlapPts = newPolyPath.contains_points(neighbPoly)
-            if any(overlapPts):
-                return False
+            #overlapPts = newPolyPath.contains_points(neighbPoly)
+            #if any(overlapPts):
+            #    return False
         # made it through all the neighbors? you're good to go
         return True
 
