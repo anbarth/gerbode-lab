@@ -20,3 +20,4 @@ if __name__ == '__main__':
             (S,numParts,Sbead,time) = coll.entropyParallel(40,makeImg=True,poly=True)
             print(S,numParts,time)
             writer.writerow([filename,S,numParts,S/numParts,time])
+            # expected runtime 9 hours

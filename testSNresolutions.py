@@ -7,19 +7,17 @@ importlib.reload(exclVol)
 
 
 if __name__ == '__main__':
-    radii = [40,45]
+    radii = [r for r in range(5,48)]
     with open('polyScalingMar25.csv','w',newline='') as file:
         writer = csv.writer(file)
-        crysfilename = 'crystals/readshock2/rs7p5_1.csv'
+        crysfilename = 'crystals/readshock2/rs2p5_1.csv'
         writer.writerow([crysfilename])
-        writer.writerow(['can we take resolution even higher?? inclusive distance. 40 worker processes.'])
-        writer.writerow(['rad','N','S_old','runtime','S_poly','runtime'])
+        writer.writerow(['freeSpacePoly, inclusive distance. how does S/N plateau? 40 worker processes. DrSpeedy'])
+        writer.writerow(['rad','S_poly','N','runtime'])
         
         for radius in radii:
             coll = exclVol.PolycrystalGrid(crysfilename,rad=radius,useNeighbs=True)
             print(coll.beadRad)
-            (Sold,N1,Sbead1,told) =   coll.entropyParallel(40,makeImg=True,poly=False)
-            print("done with old freeSpace")
-            (Spoly,N2,Sbead2,tpoly) = coll.entropyParallel(40,makeImg=True,poly=True)
-            print(radius,N1,Sold,told,Spoly,tpoly)
-            writer.writerow([radius,N1,Sold,told,Spoly,tpoly])
+            (Spoly,N,Sbead,t) = coll.entropyParallel(40,makeImg=False,poly=True)
+            print(radius,Spoly,N,t)
+            writer.writerow([radius,Spoly,N,t])
