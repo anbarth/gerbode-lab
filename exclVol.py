@@ -321,6 +321,7 @@ class PolycrystalGrid:
         # TODO return 0 for offgrid particles?
 
         center = self.particleCenters[particleID]
+        print("center",center)
         nns = self.neighbs[center]
 
         crossingPts = [] #(x,y)
@@ -332,10 +333,11 @@ class PolycrystalGrid:
 
         # go over all pairs of circles
         for i in range(len(nns)):
+            print("neighbor",i,nns[i])
             (x1,y1) = self.exclVolPolygonAt(nns[i])
             plt.plot(x1,y1)
             for j in range(i+1,len(nns)):
-                (x2,y2) = self.exclVolPolygonAt(nns[j])
+                #(x2,y2) = self.exclVolPolygonAt(nns[j])
                 
                 myCrossingPts = myGeo.circIntersections(nns[i][0], nns[i][1], 2*self.beadRad, \
                                                         nns[j][0], nns[j][1], 2*self.beadRad)
@@ -365,10 +367,10 @@ class PolycrystalGrid:
                     crossingPts.append(closestCrossingPt)
                     crossingPairs.append( (i,j) )
                     plt.plot(closestCrossingPt[0],closestCrossingPt[1],'*k')
-        plt.show()
+        
 
         myArea = myGeo.polyArea(crossingPts)
-        print(myArea)
+        print("polygon area",myArea)
         # go through each circle and cut out the appropriate segment
         # this is slightly inefficient but i think its ok
         for i in range(len(nns)):
@@ -390,10 +392,12 @@ class PolycrystalGrid:
             theta = np.arccos(cosine)
             # segment area = (1/2) * (theta-sin(theta)) * R^2
             segArea = 0.5 * (theta-np.sin(theta)) * 4*self.beadRad*self.beadRad
+            print("segment for neighbor ",i,"area",segArea)
             myArea = myArea - segArea
         
-        print(myArea)
-        return myArea/(np.pi*self.beadRad*self.beadRad)
+        #print(myArea)
+        plt.show()
+        return [particleID, myArea/(np.pi*self.beadRad*self.beadRad)]
 
 
     def isAvailPoly(self,oldCenter,newCenter):
@@ -507,7 +511,7 @@ class PolycrystalGrid:
         plt.ylim(0,self.gridSize[1])
         plt.show()
 
-    # method options: 1) old px-by-px method; 2) polygons method; 3) MC
+    # method options: 1) old px-by-px method; 2) polygons method; 3) MC; 4) analytic
     def entropy(self,makeImg=False,imgFile=None,sbeadFile=None,method=1):
         tic = time.time()
 
@@ -595,6 +599,57 @@ class PolycrystalGrid:
         toc = time.time()
 
         return [S,numParts,toc-tic]
+
+###########################################################
+    def freeSpaceGeoList(self,numProc):
+        tic = time.time()
+
+        # generate an Sbead file name, if none provided
+        i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
+        nameRoot = self.crystalFile[i+1:-4]
+
+        sbeadFile = nameRoot+'_geo'+'_spaces.csv'
+
+
+        # pick out the particles to include in entropy calculation
+        particlesInGrid = []
+        buffer = self.beadRad*2
+        for i in range(len(self.particleCenters)):
+            # don't count particles that are too close to the edge
+            p = self.particleCenters[i]
+            if not(p[0] < buffer or p[0] >= self.gridSize[0]-buffer or \
+            p[1] < buffer or p[1] >= self.gridSize[1]-buffer):
+                particlesInGrid.append(i)
+        numParts = len(particlesInGrid)
+
+        with open(sbeadFile,'w',newline='') as sbeadFileObj:
+            writer = csv.writer(sbeadFileObj)
+
+            # get all snowflakes in parallel
+            pool = mp.Pool(numProc)  
+
+            pool_results = []
+            pool_results = [pool.apply_async(self.freeSpaceGeo,args=[i]) for i in particlesInGrid]
+
+            pool.close()
+            pool.join()
+
+            for r in pool_results:
+                [pID,freeA] = r.get()
+                
+                writer.writerow([pID,freeA])
+
+
+        toc = time.time()
+
+        return [numParts,toc-tic]
+##############################################################################
+
+
+
+
+
+
 
     def entropyParallel(self,numProc,makeImg=False,imgFile=None,sbeadFile=None,poly=False):
         tic = time.time()
