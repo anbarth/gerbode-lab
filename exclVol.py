@@ -9,7 +9,10 @@ import operator
 import os
 import multiprocessing as mp
 import PIL
+import myGeo
+import importlib
 from matplotlib import path
+importlib.reload(myGeo)
 
 class PolycrystalGrid:
     # class fields:
@@ -104,6 +107,13 @@ class PolycrystalGrid:
         N = int(np.ceil(2*np.pi*self.beadRad))
         delta = 2*np.pi/N
         return [ ( p[0]+self.beadRad*np.cos(n*delta), p[1]+self.beadRad*np.sin(n*delta) ) for n in range(N) ]
+        
+        
+    def exclVolPolygonAt(self,p):
+        #N = int(np.ceil(2*np.pi*self.beadRad))
+        N = 64
+        delta = 2*np.pi/N
+        return [np.array([p[0]+2*self.beadRad*np.cos(n*delta) for n in range(N+1)]), np.array([p[1]+2*self.beadRad*np.sin(n*delta) for n in range(N+1)])]
 
     # sets the shape of a particle centered at (0,0), so you can translate it to any other position
     # ^ that's what pxOccupiedByParticle does
@@ -307,6 +317,85 @@ class PolycrystalGrid:
                         pxToCheck.append(neighbor)
         return [particleID,freePx]
 
+    def freeSpaceGeo(self,particleID):
+        # TODO return 0 for offgrid particles?
+
+        center = self.particleCenters[particleID]
+        nns = self.neighbs[center]
+
+        crossingPts = [] #(x,y)
+        crossingPairs = [] #(circle1,circle2)
+
+        plt.plot(center[0],center[1],'*r')
+        for nn in nns:
+            plt.plot(nn[0],nn[1],'*r')
+
+        # go over all pairs of circles
+        for i in range(len(nns)):
+            (x1,y1) = self.exclVolPolygonAt(nns[i])
+            plt.plot(x1,y1)
+            for j in range(i+1,len(nns)):
+                (x2,y2) = self.exclVolPolygonAt(nns[j])
+                
+                myCrossingPts = myGeo.circIntersections(nns[i][0], nns[i][1], 2*self.beadRad, \
+                                                        nns[j][0], nns[j][1], 2*self.beadRad)
+                
+                # no crossing points? skip
+                if myCrossingPts == None:
+                    continue
+                
+                # keep only the CLOSEST crossing point
+                cross1 = (myCrossingPts[0],myCrossingPts[1])
+                cross2 = (myCrossingPts[2],myCrossingPts[3])
+                if dist(center,cross1) <= dist(center,cross2):
+                    closestCrossingPt = cross1
+                else:
+                    closestCrossingPt = cross2
+                
+                # keep only crossing points that aren't contained in some other circle
+                keepMe = True
+                for k in range(len(nns)):
+                    if k == i or k == j:
+                        continue
+                    if dist(nns[k],closestCrossingPt) < 2*self.beadRad:
+                        keepMe = False
+                        break
+
+                if keepMe:
+                    crossingPts.append(closestCrossingPt)
+                    crossingPairs.append( (i,j) )
+                    plt.plot(closestCrossingPt[0],closestCrossingPt[1],'*k')
+        plt.show()
+
+        myArea = myGeo.polyArea(crossingPts)
+        print(myArea)
+        # go through each circle and cut out the appropriate segment
+        # this is slightly inefficient but i think its ok
+        for i in range(len(nns)):
+            myPts = []
+            for j in range(len(crossingPts)):
+                if crossingPairs[j][0] == i or crossingPairs[j][1] == i:
+                    myPts.append(crossingPts[j])
+            
+            # i expect to always find 0 or 2 crossing points
+            if len(myPts) == 0:
+                continue
+            if len(myPts) != 2:
+                print("anna, a big problem has happened, please come fix it")
+            
+            vec1 = (myPts[0][0]-nns[i][0],myPts[0][1]-nns[i][1])
+            vec2 = (myPts[1][0]-nns[i][0],myPts[1][1]-nns[i][1])
+            dot = vec1[0]*vec2[0] + vec1[1]*vec2[1]
+            cosine = dot/(4*self.beadRad*self.beadRad)
+            theta = np.arccos(cosine)
+            # segment area = (1/2) * (theta-sin(theta)) * R^2
+            segArea = 0.5 * (theta-np.sin(theta)) * 4*self.beadRad*self.beadRad
+            myArea = myArea - segArea
+        
+        print(myArea)
+        return myArea/(np.pi*self.beadRad*self.beadRad)
+
+
     def isAvailPoly(self,oldCenter,newCenter):
         # particle can always exist in the spot it originally is
         # we need to specify this bc the crystal might actually have some stupid little bits over overlap
@@ -335,6 +424,10 @@ class PolycrystalGrid:
                     if neighbor not in pxToCheck:
                         pxToCheck.append(neighbor)
         return [particleID,freePx]
+
+    def freeAreaPoly(self,particleID):
+        (pID,freePx) = self.freeSpacePoly(particleID)
+        return len(freePx)/len(self.beadShape)
 
     def freeSpaceMC(self,particleID):
         particleCenter = self.particleCenters[particleID]
