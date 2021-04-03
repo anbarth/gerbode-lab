@@ -117,7 +117,6 @@ class Polycrystal:
         # TODO return 0 for offgrid particles?
 
         center = self.particleCenters[particleID]
-        print("center",center)
         nns = self.neighbs[center]
 
         crossingPts = [] #(x,y)
@@ -129,7 +128,6 @@ class Polycrystal:
 
         # go over all pairs of circles
         for i in range(len(nns)):
-            print("neighbor",i,nns[i])
             (x1,y1) = self.exclVolPolygonAt(nns[i])
             plt.plot(x1,y1)
             for j in range(i+1,len(nns)):
@@ -168,7 +166,6 @@ class Polycrystal:
         # this will allow us to sort the crossing points in ccw order, which is a necessary pre-req for polyArea
         sortKey = myGeo.make_clockwiseangle_and_distance(center)
         myArea = myGeo.polyArea(sorted(crossingPts,key=sortKey))
-        print("polygon area",myArea)
         # go through each circle and cut out the appropriate segment
         # this is slightly inefficient but i think its ok
         for i in range(len(nns)):
@@ -188,13 +185,10 @@ class Polycrystal:
             dot = vec1[0]*vec2[0] + vec1[1]*vec2[1]
             cosine = dot/(4*self.beadRad*self.beadRad)
             theta = np.arccos(cosine)
-            print(i,"theta",theta*180/np.pi)
             # segment area = (1/2) * (theta-sin(theta)) * R^2
             segArea = 0.5 * (theta-np.sin(theta)) * 4*self.beadRad*self.beadRad
-            print(i,"segArea",segArea)
             myArea = myArea - segArea
-        
-        print("final area",myArea)
+
         plt.show()
         return myArea/(np.pi*self.beadRad*self.beadRad)
 
