@@ -64,7 +64,10 @@ class Polycrystal:
                 for i in range(1,len(row)):
                     myNeighbs.append(self.particleCenters[int(row[i])-1])
 
-                self.neighbs[p] = myNeighbs
+                # sortKey is a function that returns a point's angle and distance relative to p
+                # this will allow us to sort the neighbors in ccw order, which is convenient in freeSpace
+                sortKey = myGeo.make_clockwiseangle_and_distance(p)
+                self.neighbs[p] = sorted(myNeighbs,key=sortKey)
 
 
     def polygonAt(self,p):
@@ -111,7 +114,7 @@ class Polycrystal:
         plt.ylim(0,self.windowSize[1])
         plt.show()
 
-
+    
 
     def freeSpace(self,particleID):
         # TODO return 0 for offgrid particles?
@@ -122,16 +125,9 @@ class Polycrystal:
         crossingPts = [] #(x,y)
         crossingPairs = [] #(circle1,circle2)
 
-        plt.plot(center[0],center[1],'*r')
-        for nn in nns:
-            plt.plot(nn[0],nn[1],'*r')
-
         # go over all pairs of circles
         for i in range(len(nns)):
-            (x1,y1) = self.exclVolPolygonAt(nns[i])
-            plt.plot(x1,y1)
             for j in range(i+1,len(nns)):
-                (x2,y2) = self.exclVolPolygonAt(nns[j])
                 
                 myCrossingPts = myGeo.circIntersections(nns[i][0], nns[i][1], 2*self.beadRad, \
                                                         nns[j][0], nns[j][1], 2*self.beadRad)
@@ -160,14 +156,16 @@ class Polycrystal:
                 if keepMe:
                     crossingPts.append(closestCrossingPt)
                     crossingPairs.append( (i,j) )
-                    plt.plot(closestCrossingPt[0],closestCrossingPt[1],'*k')
         
         # sortKey is a function that returns a point's angle and distance relative to center
         # this will allow us to sort the crossing points in ccw order, which is a necessary pre-req for polyArea
         sortKey = myGeo.make_clockwiseangle_and_distance(center)
         myArea = myGeo.polyArea(sorted(crossingPts,key=sortKey))
+
         # go through each circle and cut out the appropriate segment
         # this is slightly inefficient but i think its ok
+        freeSpaceCurveX = []
+        freeSpaceCurveY = []
         for i in range(len(nns)):
             myPts = []
             for j in range(len(crossingPts)):
@@ -182,15 +180,56 @@ class Polycrystal:
             
             vec1 = (myPts[0][0]-nns[i][0],myPts[0][1]-nns[i][1])
             vec2 = (myPts[1][0]-nns[i][0],myPts[1][1]-nns[i][1])
-            dot = vec1[0]*vec2[0] + vec1[1]*vec2[1]
-            cosine = dot/(4*self.beadRad*self.beadRad)
-            theta = np.arccos(cosine)
+            #dot = vec1[0]*vec2[0] + vec1[1]*vec2[1]
+            #cosine = dot/(4*self.beadRad*self.beadRad)
+            #theta = np.arccos(cosine)
+            theta1 = np.arctan2(vec1[1],vec1[0])
+            theta2 = np.arctan2(vec2[1],vec2[0])
+
+            thetann = np.arctan2(nns[i][1]-center[1],nns[i][0]-center[0])
+            if theta1 >= thetann and theta1 <= np.pi:
+                theta1 = theta1 - 2*np.pi
+            if theta2 >= thetann and theta2 <= np.pi:
+                theta2 = theta2 - 2*np.pi
+            if theta1 >= -np.pi and theta1 < -2*np.pi+thetann:
+                theta1 = theta1 + 2*np.pi
+            if theta2 >= -np.pi and theta2 < -2*np.pi+thetann:
+                theta2 = theta2 + 2*np.pi
+
+            theta = abs(theta1-theta2)
             # segment area = (1/2) * (theta-sin(theta)) * R^2
             segArea = 0.5 * (theta-np.sin(theta)) * 4*self.beadRad*self.beadRad
             myArea = myArea - segArea
 
+            # add segment points to freeSpaceCurve
+            thetaMin = min(theta1,theta2)
+            thetaMax = max(theta1,theta2)
+            numSteps = int( (thetaMax-thetaMin)/(np.pi/180) ) # number of steps st every step covers 1 degree
+
+            freeSpaceCurveX.extend([nns[i][0]+2*self.beadRad*np.cos(t) for t in np.linspace(thetaMin,thetaMax,numSteps)])
+            freeSpaceCurveY.extend([nns[i][1]+2*self.beadRad*np.sin(t) for t in np.linspace(thetaMin,thetaMax,numSteps)])
+
+        return [myArea/(np.pi*self.beadRad*self.beadRad),freeSpaceCurveX,freeSpaceCurveY]
+
+
+    def drawFreeSpace(self,particleID):
+        p = self.particleCenters[particleID]
+        (freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(particleID)
+
+        fig, ax = plt.subplots()
+
+        plt.scatter(p[0],p[1])
+        circ = plt.Circle(p, self.beadRad, color='gray', alpha=0.3)
+        ax.add_artist(circ)
+
+        for nn in self.neighbs[p]:
+            plt.scatter(nn[0],nn[1])
+            circ = plt.Circle(nn, 2*self.beadRad, color='gray', alpha=0.3)
+            ax.add_artist(circ)
+
+        plt.plot(freeSpaceCurveX,freeSpaceCurveY)
         plt.show()
-        return myArea/(np.pi*self.beadRad*self.beadRad)
+        return freeArea
 
 
     def entropy(self,sbeadFile=None):
