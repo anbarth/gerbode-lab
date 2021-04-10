@@ -214,12 +214,12 @@ class Polycrystal:
         if freeArea > 0.5:
             print(particleID,"has rather large free area, worth checking out")
 
-        return [myArea/(np.pi*self.beadRad*self.beadRad),freeSpaceCurveX,freeSpaceCurveY]
+        return [particleID,myArea/(np.pi*self.beadRad*self.beadRad),freeSpaceCurveX,freeSpaceCurveY]
 
 
     def drawFreeSpace(self,particleID):
         p = self.particleCenters[particleID]
-        (freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(particleID)
+        (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(particleID)
 
         fig, ax = plt.subplots()
 
@@ -236,6 +236,52 @@ class Polycrystal:
         plt.show()
         return freeArea
 
+
+    def entropyDraw(self,sbeadFile=None):
+        tic = time.time()
+        plt.clf()
+        fig, ax = plt.subplots()
+
+        # generate an Sbead file name, if none provided
+        i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
+        nameRoot = self.crystalFile[i+1:-4]
+        if sbeadFile == None:
+            sbeadFile = nameRoot+'_Sbead.csv'
+
+
+        S = 0 # total S
+        numParts = 0 # number of particles counted
+        buffer = self.beadRad*2
+
+        with open(sbeadFile,'w',newline='') as sbeadFileObj:
+            writer = csv.writer(sbeadFileObj)
+
+            for i in range(len(self.particleCenters)):
+                # don't count particles that are too close to the edge
+                p = self.particleCenters[i]
+                if p[0] < buffer or p[0] >= self.windowSize[0]-buffer or \
+                p[1] < buffer or p[1] >= self.windowSize[1]-buffer:
+                    continue
+                numParts += 1
+
+                # find the free area
+                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i)
+                Si = np.log(freeArea)
+                S += Si
+
+                # record in Sbead file
+                writer.writerow([pID,Si])
+
+                # draw
+                plt.scatter(p[0],p[1],c="k")
+                circ = plt.Circle(p, self.beadRad, color='gray', alpha=0.3)
+                ax.add_artist(circ)
+                plt.plot(freeSpaceCurveX,freeSpaceCurveY)
+        
+        toc = time.time()
+        plt.show()
+        
+        return [S,numParts,toc-tic]
 
     def entropy(self,sbeadFile=None):
         tic = time.time()
@@ -263,7 +309,7 @@ class Polycrystal:
                 
                 numParts += 1
 
-                [pID, freeArea] = self.freeSpace(i)
+                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i)
                 Si = np.log(freeArea)
                 S += Si
                 writer.writerow([pID,Si])
