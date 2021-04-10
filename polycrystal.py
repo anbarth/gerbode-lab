@@ -55,6 +55,7 @@ class Polycrystal:
         with open(neighbFile) as csvFile:
             reader = csv.reader(csvFile, delimiter=',')
             for row in reader:
+                # TODO its super confusing that matlab IDs are pID+1 :(
                 # first element gives the particles whomst neighbors we will see
                 partID = int(row[0])-1
                 p = self.particleCenters[partID]
@@ -219,8 +220,8 @@ class Polycrystal:
         fig, ax = plt.subplots()
 
         plt.scatter(p[0],p[1])
-        circ = plt.Circle(p, self.beadRad, color='gray', alpha=0.3)
-        ax.add_artist(circ)
+        #circ = plt.Circle(p, self.beadRad, color='gray', alpha=0.3)
+        #ax.add_artist(circ)
 
         for nn in self.neighbs[p]:
             plt.scatter(nn[0],nn[1])
