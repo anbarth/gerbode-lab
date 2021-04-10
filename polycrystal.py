@@ -177,7 +177,7 @@ class Polycrystal:
             if len(myPts) == 0:
                 continue
             if len(myPts) != 2:
-                print("anna, a big problem has happened, please come fix it")
+                print(particleID,"has extraneous neighbors, come fix it")
             
             vec1 = (myPts[0][0]-nns[i][0],myPts[0][1]-nns[i][1])
             vec2 = (myPts[1][0]-nns[i][0],myPts[1][1]-nns[i][1])
@@ -209,6 +209,10 @@ class Polycrystal:
 
             freeSpaceCurveX.extend([nns[i][0]+2*self.beadRad*np.cos(t) for t in np.linspace(thetaMin,thetaMax,numSteps)])
             freeSpaceCurveY.extend([nns[i][1]+2*self.beadRad*np.sin(t) for t in np.linspace(thetaMin,thetaMax,numSteps)])
+
+        freeArea = myArea/(np.pi*self.beadRad*self.beadRad)
+        if freeArea > 0.5:
+            print(particleID,"has rather large free area, worth checking out")
 
         return [myArea/(np.pi*self.beadRad*self.beadRad),freeSpaceCurveX,freeSpaceCurveY]
 
