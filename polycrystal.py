@@ -13,6 +13,8 @@ import myGeo
 import importlib
 from matplotlib import path
 importlib.reload(myGeo)
+# TODO ctrl-F and delete useless imports
+# TODO !!! instead of checking for buffer distance in entropy, have whether or not it counts as a particle property calculated at beginning
 
 class Polycrystal:
     # class fields:
@@ -28,24 +30,53 @@ class Polycrystal:
         self.crystalFile = fname
         self.particleCenters = []
         self.neighbs = {}
+        self.windowVertices = []
+        # left, right, bot, top
+        self.windowDims = [10000,-10000,10000,-1000] # dummy values to start
 
 
         # read in particle centers from csv
         with open(fname) as csvFile:
             reader = csv.reader(csvFile, delimiter=',')
-            first = True
+            lineNum = 1
             for row in reader:
-                # first line of csv gives xmin, ymin, window dimensions, and bead radius
-                if first:
-                    self.beadRad = float(row[4])
-                    self.xmin = float(row[0])
-                    self.ymin = float(row[1])
-                    self.windowSize = [float(row[2]),float(row[3])]
-                    first = False
+                # first line of csv gives bead radius
+                if lineNum == 1:
+                    self.beadRad = float(row[0])
+                    #self.xmin = float(row[0])
+                    #self.ymin = float(row[1])
+                    #self.windowSize = [float(row[2]),float(row[3])]
+                    lineNum += 1
                     continue
+                # second line gives polygon window
+                if lineNum == 2:
+                    if len(row) % 2 != 0:
+                        print("warning: row 2 should have an even number of entries, it doesn't")
+                    for i in range(int(len(row)/2)):
+                        myX = float(row[2*i])
+                        myY = float(row[2*i+1])
+                        self.windowVertices.append((myX,myY))
+
+                        # adjust window bounds:
+                        # left
+                        if myX < self.windowDims[0]:
+                            self.windowDims[0] = myX
+                        # right
+                        if myX > self.windowDims[1]:
+                            self.windowDims[1] = myX
+                        # bot
+                        if myY < self.windowDims[2]:
+                            self.windowDims[2] = myY
+                        # top
+                        if myY > self.windowDims[3]:
+                            self.windowDims[3] = myY
+                    lineNum += 1
+                    continue
+                        
+
                 # after the first line, it's particle centers all the way down
-                p = ( (float(row[0])-self.xmin) , 
-                      (float(row[1])-self.ymin) )
+                p = ( (float(row[0])) , 
+                      (float(row[1])) )
                 self.particleCenters.append(p)
 
         # read in neighbors
@@ -69,6 +100,12 @@ class Polycrystal:
                 # this will allow us to sort the neighbors in ccw order, which is convenient in freeSpace
                 sortKey = myGeo.make_clockwiseangle_and_distance(p)
                 self.neighbs[p] = sorted(myNeighbs,key=sortKey)
+        
+        # decide which beads are in the window and outside the window
+        windowPath = path.Path(self.windowVertices)
+        # inWindow is a list of booleans, ith value says if particle i is in the window
+        self.inWindow = windowPath.contains_points(self.particleCenters)
+
 
 
     def polygonAt(self,p):
@@ -87,16 +124,23 @@ class Polycrystal:
     
     def showGrid(self):
         fig, ax = plt.subplots()
-        for (x,y) in self.particleCenters:
-            circ = plt.Circle((x, y), self.beadRad, color='gray', alpha=0.3)
-            ax.add_artist(circ)
+        ax.set_aspect(1)
 
-        plt.scatter(*zip(*self.particleCenters),marker='.')
-        plt.xlim(0,self.windowSize[0])
-        plt.ylim(0,self.windowSize[1])
-        #plt.xticks(np.arange(0, windowSize[0], step=1))
-        #plt.yticks(np.arange(0, windowSize[1], step=1))
-        #plt.grid(b=True,which='both',axis='both')
+        for i in range(len(self.particleCenters)):
+            p = self.particleCenters[i]
+            circ = plt.Circle(p, self.beadRad, facecolor='gray',edgecolor=None, alpha=0.3)
+            ax.add_artist(circ)
+    
+            if self.inWindow[i]:
+                circ = plt.Circle(p, self.beadRad/20, facecolor='k', edgecolor=None)
+                ax.add_artist(circ)
+
+        #plt.xlim(0,self.windowSize[0])
+        #plt.ylim(0,self.windowSize[1])
+        plt.xlim(self.windowDims[0],self.windowDims[1])
+        plt.ylim(self.windowDims[2],self.windowDims[3])
+
+
         plt.show()
 
 
@@ -111,14 +155,16 @@ class Polycrystal:
             yvals = [y,p[1]]
             plt.plot(xvals,yvals,color='black')
         plt.scatter(*zip(*self.particleCenters),marker='.')
-        plt.xlim(0,self.windowSize[0])
-        plt.ylim(0,self.windowSize[1])
+        #plt.xlim(0,self.windowSize[0])
+        #plt.ylim(0,self.windowSize[1])
         plt.show()
 
     
 
     def freeSpace(self,particleID):
-        # TODO return 0 for offgrid particles?
+        # return 0 for particles outside the window
+        if not self.inWindow[particleID]:
+            return 0
 
         center = self.particleCenters[particleID]
         nns = self.neighbs[center]
@@ -237,17 +283,19 @@ class Polycrystal:
         return freeArea
 
 
-    def entropyDraw(self,sbeadFile=None):
+    def entropyDraw(self,sbeadFile=None,imgFile=None):
         tic = time.time()
-        plt.clf()
         fig, ax = plt.subplots()
+        ax.set_aspect(1)
 
         # generate an Sbead file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
         nameRoot = self.crystalFile[i+1:-4]
         if sbeadFile == None:
             sbeadFile = nameRoot+'_Sbead.csv'
-
+        if imgFile == None:
+            imgFile = nameRoot+'_snowflakes.png'
+        cmap = cm.get_cmap('viridis')
 
         S = 0 # total S
         numParts = 0 # number of particles counted
@@ -257,30 +305,41 @@ class Polycrystal:
             writer = csv.writer(sbeadFileObj)
 
             for i in range(len(self.particleCenters)):
-                # don't count particles that are too close to the edge
                 p = self.particleCenters[i]
-                if p[0] < buffer or p[0] >= self.windowSize[0]-buffer or \
-                p[1] < buffer or p[1] >= self.windowSize[1]-buffer:
+
+                # draw
+                circ = plt.Circle(p, self.beadRad, facecolor='gray',edgecolor=None, alpha=0.3)
+                ax.add_artist(circ)
+
+                # don't count particles that are too close to the edge
+
+                #if p[0] < buffer or p[0] >= self.windowSize[0]-buffer or \
+                #p[1] < buffer or p[1] >= self.windowSize[1]-buffer:
+                #    continue
+                if not self.inWindow[i]:
                     continue
                 numParts += 1
+
+                # draw a black dot to indicate this particle is included
+                circ = plt.Circle(p, self.beadRad/20, facecolor='k', edgecolor=None)
+                ax.add_artist(circ)
 
                 # find the free area
                 (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i)
                 Si = np.log(freeArea)
                 S += Si
 
-                # record in Sbead file
-                writer.writerow([pID,Si])
+                writer.writerow([pID,Si]) # record in Sbead file
 
-                # draw
-                plt.scatter(p[0],p[1],c="k")
-                circ = plt.Circle(p, self.beadRad, color='gray', alpha=0.3)
-                ax.add_artist(circ)
-                plt.plot(freeSpaceCurveX,freeSpaceCurveY)
+                # draw free area
+                # pick a color (freeArea = 0 --> blue; freeArea >= pi R^2/6 --> yellow)
+                rgb = cmap(freeArea*12-0.15)[0:3]
+                print(freeArea*12-0.15)
+                ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=rgb,edgecolor='black',lw=0.15)
         
+        #pickle.dump(fig, open('Banana.fig.pickle', 'wb'))
+        fig.savefig(imgFile, dpi=900) 
         toc = time.time()
-        plt.show()
-        
         return [S,numParts,toc-tic]
 
     def entropy(self,sbeadFile=None):
@@ -303,8 +362,11 @@ class Polycrystal:
             for i in range(len(self.particleCenters)):
                 # don't count particles that are too close to the edge
                 p = self.particleCenters[i]
-                if p[0] < buffer or p[0] >= self.windowSize[0]-buffer or \
-                p[1] < buffer or p[1] >= self.windowSize[1]-buffer:
+                # TODO aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                #if p[0] < buffer or p[0] >= self.windowSize[0]-buffer or \
+                #p[1] < buffer or p[1] >= self.windowSize[1]-buffer:
+                #    continue
+                if not self.inWindow[i]:
                     continue
                 
                 numParts += 1
@@ -337,8 +399,10 @@ class Polycrystal:
         for i in range(len(self.particleCenters)):
             # don't count particles that are too close to the edge
             p = self.particleCenters[i]
-            if not(p[0] < buffer or p[0] >= self.windowSize[0]-buffer or \
-            p[1] < buffer or p[1] >= self.windowSize[1]-buffer):
+            #if not(p[0] < buffer or p[0] >= self.windowSize[0]-buffer or \
+            #p[1] < buffer or p[1] >= self.windowSize[1]-buffer):
+            # TODO aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            if self.inWindow[i]:
                 particlesInGrid.append(i)
         numParts = len(particlesInGrid)
 
@@ -361,11 +425,6 @@ class Polycrystal:
         toc = time.time()
 
         return [S,numParts,toc-tic]
-
-   
-    def volumeFraction(self):
-        # TODO this would need to change for a hexagonal grid
-        return len(self.occupiedPx) / self.windowSize[0] / self.windowSize[1]
 
    
 
