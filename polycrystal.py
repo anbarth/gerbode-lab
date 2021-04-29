@@ -25,7 +25,7 @@ class Polycrystal:
     #   particleCenters: 
 
     # constructor takes the input csv file
-    def __init__(self,fname):
+    def __init__(self,fname,neighbFile=None):
 
         self.crystalFile = fname
         self.particleCenters = []
@@ -80,9 +80,13 @@ class Polycrystal:
                 self.particleCenters.append(p)
 
         # read in neighbors
-        i = self.crystalFile.find('/') # chop off any part of the name before a slash
-        nameRoot = self.crystalFile[i+1:-4]
-        neighbFile = "crysNeighbs/"+nameRoot+"_neighbs.csv"
+        if neighbFile == None:
+            i = self.crystalFile.find('/') # chop off any part of the name before a slash
+            nameRoot = self.crystalFile[i+1:-4]
+            neighbFile = "crysNeighbs/"+nameRoot+"_neighbs.csv"
+        else:
+            neighbFile = "crysNeighbs/"+neighbFile
+
         with open(neighbFile) as csvFile:
             reader = csv.reader(csvFile, delimiter=',')
             for row in reader:
@@ -287,6 +291,8 @@ class Polycrystal:
         tic = time.time()
         fig, ax = plt.subplots()
         ax.set_aspect(1)
+        plt.xlim(15,45)
+        plt.ylim(24,54)
 
         # generate an Sbead file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
@@ -308,7 +314,7 @@ class Polycrystal:
                 p = self.particleCenters[i]
 
                 # draw
-                circ = plt.Circle(p, self.beadRad, facecolor='gray',edgecolor=None, alpha=0.3)
+                circ = plt.Circle(p, self.beadRad, facecolor='#b8b8b8',edgecolor='black', alpha=1,zorder=0)
                 ax.add_artist(circ)
 
                 # don't count particles that are too close to the edge
@@ -321,7 +327,7 @@ class Polycrystal:
                 numParts += 1
 
                 # draw a black dot to indicate this particle is included
-                circ = plt.Circle(p, self.beadRad/20, facecolor='k', edgecolor=None)
+                circ = plt.Circle(p, self.beadRad/15, facecolor='k', edgecolor=None,zorder=10)
                 ax.add_artist(circ)
 
                 # find the free area
@@ -333,12 +339,18 @@ class Polycrystal:
 
                 # draw free area
                 # pick a color (freeArea = 0 --> blue; freeArea >= pi R^2/6 --> yellow)
-                rgb = cmap(freeArea*12-0.15)[0:3]
-                print(freeArea*12-0.15)
-                ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=rgb,edgecolor='black',lw=0.15)
+                rgb = cmap(freeArea*50-1)[0:3]
+                #print(freeArea)
+                cen = centroid(freeSpaceCurveX,freeSpaceCurveY)
+                biggerCurveX = 3*(np.array(freeSpaceCurveX)-cen[0])+cen[0]
+                biggerCurveY = 3*(np.array(freeSpaceCurveY)-cen[1])+cen[1]
+                #ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=rgb,edgecolor='black',lw=0.15)
+                ax.fill(biggerCurveX,biggerCurveY, facecolor=rgb,edgecolor='black',lw=0.5,zorder=5)
         
+        #0.034 to 0.023
+
         #pickle.dump(fig, open('Banana.fig.pickle', 'wb'))
-        fig.savefig(imgFile, dpi=900) 
+        fig.savefig('bigger_snowflakes2/'+imgFile, dpi=900) 
         toc = time.time()
         return [S,numParts,toc-tic]
 
@@ -433,3 +445,8 @@ def dist(p1,p2):
     (x2,y2) = p2
     return np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
 
+def centroid(x_coords,y_coords):
+    _len = len(x_coords)
+    centroid_x = sum(x_coords)/_len
+    centroid_y = sum(y_coords)/_len
+    return [centroid_x, centroid_y]
