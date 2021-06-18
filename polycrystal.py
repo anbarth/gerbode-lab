@@ -81,12 +81,12 @@ class Polycrystal:
                       (-1*float(row[1])) )
                 self.particleCenters.append(p)
                 
-                if windowOverride
+                if windowOverride:
                     self.inWindow.append(bool(int(row[2])))
 
 
         # decide which beads are in the window and outside the window
-        if not windowOverride
+        if not windowOverride:
             windowPath = path.Path(self.windowVertices)
             self.inWindow = windowPath.contains_points(self.particleCenters)
 
@@ -146,7 +146,7 @@ class Polycrystal:
             if self.inWindow[i]:
                 circ = plt.Circle(p, self.beadRad/20, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
-            plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
+            #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
 
         plt.xlim(self.windowDims[0]-25,self.windowDims[1]+25)
         plt.ylim(self.windowDims[2]-25,self.windowDims[3]+25)
