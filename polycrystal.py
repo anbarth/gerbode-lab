@@ -8,7 +8,6 @@ import random
 import operator
 import os
 import multiprocessing as mp
-import PIL
 import myGeo
 import importlib
 from matplotlib import path
@@ -25,7 +24,9 @@ class Polycrystal:
     #   particleCenters: 
 
     # constructor takes the input csv file
-    def __init__(self,fname,neighbFile=None):
+    # windowOverride=False (default) means count up entropy for all particles in polygon window (csv line 2)
+    # windowOverride=True (useful for fake grainsplitting events) means inWindow is given line-by-line in the csv in the 3rd column
+    def __init__(self,fname,neighbFile=None,windowOverride=False):
 
         self.crystalFile = fname
         self.particleCenters = []
@@ -33,7 +34,8 @@ class Polycrystal:
         self.windowVertices = []
         # left, right, bot, top
         self.windowDims = [10000,-10000,10000,-1000] # dummy values to start
-
+        # inWindow is a list of booleans, ith value says if particle i is in the window
+        self.inWindow = []
 
         # read in particle centers from csv
         with open(fname) as csvFile:
@@ -54,7 +56,7 @@ class Polycrystal:
                         print("warning: row 2 should have an even number of entries, it doesn't")
                     for i in range(int(len(row)/2)):
                         myX = float(row[2*i])
-                        myY = float(row[2*i+1])
+                        myY = -1*float(row[2*i+1])
                         self.windowVertices.append((myX,myY))
 
                         # adjust window bounds:
@@ -76,8 +78,17 @@ class Polycrystal:
 
                 # after the first line, it's particle centers all the way down
                 p = ( (float(row[0])) , 
-                      (float(row[1])) )
+                      (-1*float(row[1])) )
                 self.particleCenters.append(p)
+                
+                if windowOverride
+                    self.inWindow.append(bool(int(row[2])))
+
+
+        # decide which beads are in the window and outside the window
+        if not windowOverride
+            windowPath = path.Path(self.windowVertices)
+            self.inWindow = windowPath.contains_points(self.particleCenters)
 
         # read in neighbors
         if neighbFile == None:
@@ -105,10 +116,7 @@ class Polycrystal:
                 sortKey = myGeo.make_clockwiseangle_and_distance(p)
                 self.neighbs[p] = sorted(myNeighbs,key=sortKey)
         
-        # decide which beads are in the window and outside the window
-        windowPath = path.Path(self.windowVertices)
-        # inWindow is a list of booleans, ith value says if particle i is in the window
-        self.inWindow = windowPath.contains_points(self.particleCenters)
+       
 
 
 
@@ -138,11 +146,10 @@ class Polycrystal:
             if self.inWindow[i]:
                 circ = plt.Circle(p, self.beadRad/20, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
+            plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
 
-        #plt.xlim(0,self.windowSize[0])
-        #plt.ylim(0,self.windowSize[1])
-        plt.xlim(self.windowDims[0],self.windowDims[1])
-        plt.ylim(self.windowDims[2],self.windowDims[3])
+        plt.xlim(self.windowDims[0]-25,self.windowDims[1]+25)
+        plt.ylim(self.windowDims[2]-25,self.windowDims[3]+25)
 
 
         plt.show()
@@ -291,14 +298,14 @@ class Polycrystal:
         tic = time.time()
         fig, ax = plt.subplots()
         ax.set_aspect(1)
-        plt.xlim(15,45)
-        plt.ylim(24,54)
+        #plt.xlim(15,45)
+        #plt.ylim(24,54)
 
         # generate an Sbead file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
         nameRoot = self.crystalFile[i+1:-4]
         if sbeadFile == None:
-            sbeadFile = nameRoot+'_Sbead.csv'
+            sbeadFile = nameRoot+'_freeSpaces.csv'
         if imgFile == None:
             imgFile = nameRoot+'_snowflakes.png'
         cmap = cm.get_cmap('viridis')
@@ -314,7 +321,7 @@ class Polycrystal:
                 p = self.particleCenters[i]
 
                 # draw
-                circ = plt.Circle(p, self.beadRad, facecolor='#b8b8b8',edgecolor='black', alpha=1,zorder=0)
+                circ = plt.Circle(p, self.beadRad, facecolor='#b8b8b8',edgecolor='black',linewidth=0,alpha=1,zorder=0)
                 ax.add_artist(circ)
 
                 # don't count particles that are too close to the edge
@@ -328,29 +335,30 @@ class Polycrystal:
 
                 # draw a black dot to indicate this particle is included
                 circ = plt.Circle(p, self.beadRad/15, facecolor='k', edgecolor=None,zorder=10)
-                ax.add_artist(circ)
+                ax.add_artist(circ) 
 
                 # find the free area
                 (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i)
                 Si = np.log(freeArea)
                 S += Si
 
-                writer.writerow([pID,Si]) # record in Sbead file
+                writer.writerow([pID,freeArea]) # record in Sbead file
 
                 # draw free area
                 # pick a color (freeArea = 0 --> blue; freeArea >= pi R^2/6 --> yellow)
-                rgb = cmap(freeArea*50-1)[0:3]
+                # cmap takes a number 0 to 1
+                rgb = cmap((freeArea-0.035)*6.9)[0:3]
                 #print(freeArea)
-                cen = centroid(freeSpaceCurveX,freeSpaceCurveY)
-                biggerCurveX = 3*(np.array(freeSpaceCurveX)-cen[0])+cen[0]
-                biggerCurveY = 3*(np.array(freeSpaceCurveY)-cen[1])+cen[1]
-                #ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=rgb,edgecolor='black',lw=0.15)
-                ax.fill(biggerCurveX,biggerCurveY, facecolor=rgb,edgecolor='black',lw=0.5,zorder=5)
+                #cen = centroid(freeSpaceCurveX,freeSpaceCurveY)
+                #biggerCurveX = 3*(np.array(freeSpaceCurveX)-cen[0])+cen[0]
+                #biggerCurveY = 3*(np.array(freeSpaceCurveY)-cen[1])+cen[1]
+                ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=rgb,edgecolor='black',lw=0.15)
+                #ax.fill(biggerCurveX,biggerCurveY, facecolor=rgb,edgecolor='black',lw=0.5,zorder=5)
         
         #0.034 to 0.023
 
         #pickle.dump(fig, open('Banana.fig.pickle', 'wb'))
-        fig.savefig('bigger_snowflakes2/'+imgFile, dpi=900) 
+        fig.savefig(imgFile, dpi=900) 
         toc = time.time()
         return [S,numParts,toc-tic]
 
