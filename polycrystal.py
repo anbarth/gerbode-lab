@@ -56,7 +56,7 @@ class Polycrystal:
                         print("warning: row 2 should have an even number of entries, it doesn't")
                     for i in range(int(len(row)/2)):
                         myX = float(row[2*i])
-                        myY = -1*float(row[2*i+1])
+                        myY = float(row[2*i+1])
                         self.windowVertices.append((myX,myY))
 
                         # adjust window bounds:
@@ -78,12 +78,11 @@ class Polycrystal:
 
                 # after the first line, it's particle centers all the way down
                 p = ( (float(row[0])) , 
-                      (-1*float(row[1])) )
+                      (float(row[1])) )
                 self.particleCenters.append(p)
                 
                 if windowOverride:
                     self.inWindow.append(bool(int(row[2])))
-
 
         # decide which beads are in the window and outside the window
         if not windowOverride:
@@ -146,28 +145,38 @@ class Polycrystal:
             if self.inWindow[i]:
                 circ = plt.Circle(p, self.beadRad/20, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
-            #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
+                plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
 
-        plt.xlim(self.windowDims[0]-25,self.windowDims[1]+25)
-        plt.ylim(self.windowDims[2]-25,self.windowDims[3]+25)
+        plt.xlim(self.windowDims[0],self.windowDims[1])
+        plt.ylim(self.windowDims[2],self.windowDims[3])
 
 
         plt.show()
 
 
-    def showNeighbors(self,p):
+    def showNeighbors(self,pID):
+        p = self.particleCenters[pID]
         fig, ax = plt.subplots()
-        for (x,y) in self.particleCenters:
-            circ = plt.Circle((x, y), self.beadRad, color='gray', alpha=0.3)
+        ax.set_aspect(1)
+        
+        for i in range(len(self.particleCenters)):
+            q = self.particleCenters[i]
+            circ = plt.Circle(q, self.beadRad, facecolor='gray',edgecolor=None, alpha=0.3)
             ax.add_artist(circ)
+    
+            if self.inWindow[i]:
+                circ = plt.Circle(q, self.beadRad/20, facecolor='k', edgecolor=None)
+                ax.add_artist(circ)
+            
+            plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
 
         for (x,y) in self.neighbs[p]:
             xvals = [x,p[0]]
             yvals = [y,p[1]]
             plt.plot(xvals,yvals,color='black')
-        plt.scatter(*zip(*self.particleCenters),marker='.')
-        #plt.xlim(0,self.windowSize[0])
-        #plt.ylim(0,self.windowSize[1])
+
+        plt.xlim(self.windowDims[0],self.windowDims[1])
+        plt.ylim(self.windowDims[2],self.windowDims[3])
         plt.show()
 
     
@@ -234,7 +243,7 @@ class Polycrystal:
             if len(myPts) == 0:
                 continue
             if len(myPts) != 2:
-                print(particleID,"has extraneous neighbors, come fix it")
+                print(particleID,"(MATLAB ID",str(particleID+1)+") has extraneous neighbors, come fix it")
             
             vec1 = (myPts[0][0]-nns[i][0],myPts[0][1]-nns[i][1])
             vec2 = (myPts[1][0]-nns[i][0],myPts[1][1]-nns[i][1])
@@ -279,10 +288,15 @@ class Polycrystal:
         (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(particleID)
 
         fig, ax = plt.subplots()
+        ax.set_aspect(1)
 
         plt.scatter(p[0],p[1])
         #circ = plt.Circle(p, self.beadRad, color='gray', alpha=0.3)
         #ax.add_artist(circ)
+
+        for i in range(len(self.particleCenters)):
+            q = self.particleCenters[i]
+            plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
 
         for nn in self.neighbs[p]:
             plt.scatter(nn[0],nn[1])
@@ -298,8 +312,8 @@ class Polycrystal:
         tic = time.time()
         fig, ax = plt.subplots()
         ax.set_aspect(1)
-        #plt.xlim(15,45)
-        #plt.ylim(24,54)
+        plt.xlim(40,160)
+        plt.ylim(40,160)
 
         # generate an Sbead file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
