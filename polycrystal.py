@@ -104,8 +104,8 @@ class Polycrystal:
             for row in reader:
                 # TODO its super confusing that matlab IDs are pID+1 :(
                 # first element gives the particles whomst neighbors we will see
-                partID = int(row[0])-1
-                p = self.particleCenters[partID]
+                partID = int(row[0])
+                p = self.particleCenters[partID-1]
                 
                 # subsequent elements are that particle's neighbors
                 myNeighbs = []
@@ -116,24 +116,6 @@ class Polycrystal:
                 # this will allow us to sort the neighbors in ccw order, which is convenient in freeSpace
                 sortKey = myGeo.make_clockwiseangle_and_distance(p)
                 self.neighbs[p] = sorted(myNeighbs,key=sortKey)
-        
-       
-
-
-
-    def polygonAt(self,p):
-        # pick an N st the sidelength of an N-gon is ~= the length of a pixel
-        N = int(np.ceil(2*np.pi*self.beadRad))
-        delta = 2*np.pi/N
-        return [ ( p[0]+self.beadRad*np.cos(n*delta), p[1]+self.beadRad*np.sin(n*delta) ) for n in range(N) ]
-        
-        
-    def exclVolPolygonAt(self,p):
-        #N = int(np.ceil(2*np.pi*self.beadRad))
-        N = 64
-        delta = 2*np.pi/N
-        return [np.array([p[0]+2*self.beadRad*np.cos(n*delta) for n in range(N+1)]), np.array([p[1]+2*self.beadRad*np.sin(n*delta) for n in range(N+1)])]
-
     
     def showGrid(self):
         fig, ax = plt.subplots()
