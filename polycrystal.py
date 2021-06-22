@@ -139,7 +139,7 @@ class Polycrystal:
 
 
     def showNeighbors(self,pID):
-        p = self.particleCenters[pID]
+        p = self.particleCenters[pID-1]
         fig, ax = plt.subplots()
         ax.set_aspect(1)
         
@@ -155,10 +155,6 @@ class Polycrystal:
             plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
 
         for (x,y) in self.neighbs[p]:
-            #xvals = [x,p[0]]
-            #yvals = [y,p[1]]
-            #plt.plot(xvals,yvals,color='black')
-
             circ = plt.Circle((x,y), 2*self.beadRad, facecolor=(0, 0, 0, 0),edgecolor='r')
             ax.add_artist(circ)
 
@@ -175,10 +171,10 @@ class Polycrystal:
 
     def freeSpace(self,particleID):
         # return 0 for particles outside the window
-        if not self.inWindow[particleID]:
+        if not self.inWindow[particleID-1]:
             return 0
 
-        center = self.particleCenters[particleID]
+        center = self.particleCenters[particleID-1]
         nns = self.neighbs[center]
 
         crossingPts = [] #(x,y)
@@ -235,13 +231,11 @@ class Polycrystal:
             if len(myPts) == 0:
                 continue
             if len(myPts) != 2:
-                print(particleID,"(MATLAB ID",str(particleID+1)+") has extraneous neighbors, come fix it")
+                print(particleID,"has extraneous neighbors, come fix it")
             
             vec1 = (myPts[0][0]-nns[i][0],myPts[0][1]-nns[i][1])
             vec2 = (myPts[1][0]-nns[i][0],myPts[1][1]-nns[i][1])
-            #dot = vec1[0]*vec2[0] + vec1[1]*vec2[1]
-            #cosine = dot/(4*self.beadRad*self.beadRad)
-            #theta = np.arccos(cosine)
+
             theta1 = np.arctan2(vec1[1],vec1[0])
             theta2 = np.arctan2(vec2[1],vec2[0])
 
@@ -276,7 +270,7 @@ class Polycrystal:
 
 
     def drawFreeSpace(self,particleID):
-        p = self.particleCenters[particleID]
+        p = self.particleCenters[particleID-1]
         (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(particleID)
 
         fig, ax = plt.subplots()
@@ -330,11 +324,7 @@ class Polycrystal:
                 circ = plt.Circle(p, self.beadRad, facecolor='#b8b8b8',edgecolor='black',linewidth=0,alpha=1,zorder=0)
                 ax.add_artist(circ)
 
-                # don't count particles that are too close to the edge
-
-                #if p[0] < buffer or p[0] >= self.windowSize[0]-buffer or \
-                #p[1] < buffer or p[1] >= self.windowSize[1]-buffer:
-                #    continue
+                # don't count particles that are outside the window
                 if not self.inWindow[i]:
                     continue
                 numParts += 1
@@ -343,12 +333,12 @@ class Polycrystal:
                 circ = plt.Circle(p, self.beadRad/15, facecolor='k', edgecolor=None,zorder=10)
                 ax.add_artist(circ) 
 
-                # find the free area
-                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i)
+                # find the free area -- note that particleID = i+1 !!
+                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i+1)
 
                 if freeArea == 0:
                     Si = 0
-                    print("free area appears to be 0 for "+str(i)+" (MATLAB ID "+str(i+1)+"), go check it out")
+                    print("free area appears to be 0 for "+str(i+1)+", go check it out")
                 else:
                     Si = np.log(freeArea)
 
@@ -393,22 +383,19 @@ class Polycrystal:
             writer = csv.writer(sbeadFileObj)
 
             for i in range(len(self.particleCenters)):
-                # don't count particles that are too close to the edge
+                
                 p = self.particleCenters[i]
-                # TODO aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-                #if p[0] < buffer or p[0] >= self.windowSize[0]-buffer or \
-                #p[1] < buffer or p[1] >= self.windowSize[1]-buffer:
-                #    continue
+
+                # don't count particles that are outside the window
                 if not self.inWindow[i]:
                     continue
                 
                 numParts += 1
 
-                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i)
+                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i+1)
                 Si = np.log(freeArea)
                 S += Si
                 writer.writerow([pID,Si])
-
 
         toc = time.time()
         return [S,numParts,toc-tic]
@@ -423,20 +410,18 @@ class Polycrystal:
         if sbeadFile == None:
             sbeadFile = nameRoot+'_Sbead.csv'
 
-
         S = 0 # total S
 
         # pick out the particles to include in entropy calculation
         particlesInGrid = []
         buffer = self.beadRad*2
         for i in range(len(self.particleCenters)):
-            # don't count particles that are too close to the edge
             p = self.particleCenters[i]
-            #if not(p[0] < buffer or p[0] >= self.windowSize[0]-buffer or \
-            #p[1] < buffer or p[1] >= self.windowSize[1]-buffer):
-            # TODO aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+            # don't count particles that are outside the window
             if self.inWindow[i]:
-                particlesInGrid.append(i)
+                particlesInGrid.append(i+1)
+
         numParts = len(particlesInGrid)
 
         with open(sbeadFile,'w',newline='') as sbeadFileObj:
@@ -444,7 +429,7 @@ class Polycrystal:
 
             # get all snowflakes in parallel
             pool = mp.Pool(numProc)  
-            pool_results = [pool.apply_async(self.freeSpace,args=[i]) for i in particlesInGrid]
+            pool_results = [pool.apply_async(self.freeSpace,args=[pID]) for pID in particlesInGrid]
 
             pool.close()
             pool.join()
