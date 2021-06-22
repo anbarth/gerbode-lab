@@ -26,7 +26,7 @@ class Polycrystal:
     # constructor takes the input csv file
     # windowOverride=False (default) means count up entropy for all particles in polygon window (csv line 2)
     # windowOverride=True (useful for fake grainsplitting events) means inWindow is given line-by-line in the csv in the 3rd column
-    def __init__(self,fname,neighbFile=None,windowOverride=False):
+    def __init__(self,fname,neighbFile=None,windowOverride=False,radius=0):
 
         self.crystalFile = fname
         self.particleCenters = []
@@ -45,6 +45,8 @@ class Polycrystal:
                 # first line of csv gives bead radius
                 if lineNum == 1:
                     self.beadRad = float(row[0])
+                    if radius != 0:
+                        self.beadRad = radius
                     #self.xmin = float(row[0])
                     #self.ymin = float(row[1])
                     #self.windowSize = [float(row[2]),float(row[3])]
@@ -143,9 +145,9 @@ class Polycrystal:
             ax.add_artist(circ)
     
             if self.inWindow[i]:
-                circ = plt.Circle(p, self.beadRad/20, facecolor='k', edgecolor=None)
+                circ = plt.Circle(p, self.beadRad/10, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
-                plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
+                #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
 
         plt.xlim(self.windowDims[0],self.windowDims[1])
         plt.ylim(self.windowDims[2],self.windowDims[3])
@@ -171,12 +173,20 @@ class Polycrystal:
             plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
 
         for (x,y) in self.neighbs[p]:
-            xvals = [x,p[0]]
-            yvals = [y,p[1]]
-            plt.plot(xvals,yvals,color='black')
+            #xvals = [x,p[0]]
+            #yvals = [y,p[1]]
+            #plt.plot(xvals,yvals,color='black')
 
-        plt.xlim(self.windowDims[0],self.windowDims[1])
-        plt.ylim(self.windowDims[2],self.windowDims[3])
+            circ = plt.Circle((x,y), 2*self.beadRad, facecolor=(0, 0, 0, 0),edgecolor='r')
+            ax.add_artist(circ)
+
+        myLeft = min([x for (x,y) in self.neighbs[p]])
+        myRight = max([x for (x,y) in self.neighbs[p]])
+        myBot = min([y for (x,y) in self.neighbs[p]])
+        myTop = max([y for (x,y) in self.neighbs[p]])
+
+        plt.xlim(myLeft-self.beadRad,myRight+self.beadRad)
+        plt.ylim(myBot-self.beadRad,myTop+self.beadRad)
         plt.show()
 
     
@@ -312,8 +322,8 @@ class Polycrystal:
         tic = time.time()
         fig, ax = plt.subplots()
         ax.set_aspect(1)
-        plt.xlim(40,160)
-        plt.ylim(40,160)
+        plt.xlim(140,460)
+        plt.ylim(140,460)
 
         # generate an Sbead file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
@@ -353,7 +363,13 @@ class Polycrystal:
 
                 # find the free area
                 (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i)
-                Si = np.log(freeArea)
+
+                if freeArea == 0:
+                    Si = 0
+                    print("free area appears to be 0 for "+str(i)+" (MATLAB ID "+str(i+1)+"), go check it out")
+                else:
+                    Si = np.log(freeArea)
+
                 S += Si
 
                 writer.writerow([pID,freeArea]) # record in Sbead file
@@ -372,7 +388,8 @@ class Polycrystal:
         #0.034 to 0.023
 
         #pickle.dump(fig, open('Banana.fig.pickle', 'wb'))
-        fig.savefig(imgFile, dpi=900) 
+        fig.savefig(imgFile, dpi=900)
+        plt.close(fig)
         toc = time.time()
         return [S,numParts,toc-tic]
 
