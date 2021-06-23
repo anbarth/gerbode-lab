@@ -47,9 +47,6 @@ class Polycrystal:
                     self.beadRad = float(row[0])
                     if radius != 0:
                         self.beadRad = radius
-                    #self.xmin = float(row[0])
-                    #self.ymin = float(row[1])
-                    #self.windowSize = [float(row[2]),float(row[3])]
                     lineNum += 1
                     continue
                 # second line gives polygon window
@@ -79,12 +76,18 @@ class Polycrystal:
                         
 
                 # after the first line, it's particle centers all the way down
-                p = ( (float(row[0])) , 
-                      (float(row[1])) )
+                # col 0 gives particle ID, but that's just so that the csv is human-readable.
+                # it's redundant information bc the particles need to be in particle ID order anyway
+
+                # col 1 and 2 are (x,y) position
+                p = ( (float(row[1])) , 
+                      (float(row[2])) )
                 self.particleCenters.append(p)
                 
+                # col 3 optionally says if this particle should be counted when calculating S
+                # if this option is turned off, i'll just use all particles in the polygon window
                 if windowOverride:
-                    self.inWindow.append(bool(int(row[2])))
+                    self.inWindow.append(bool(int(row[3])))
 
         # decide which beads are in the window and outside the window
         if not windowOverride:
@@ -298,8 +301,8 @@ class Polycrystal:
         tic = time.time()
         fig, ax = plt.subplots()
         ax.set_aspect(1)
-        plt.xlim(140,460)
-        plt.ylim(140,460)
+        #plt.xlim(140,460)
+        #plt.ylim(140,460)
 
         # generate an Sbead file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
