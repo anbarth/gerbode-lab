@@ -8,8 +8,6 @@ import myGeo
 import importlib
 from matplotlib import path
 importlib.reload(myGeo)
-# TODO ctrl-F and delete useless imports
-# TODO !!! instead of checking for buffer distance in entropy, have whether or not it counts as a particle property calculated at beginning
 
 class Polycrystal:
     # class fields:
@@ -167,17 +165,19 @@ class Polycrystal:
         plt.show()
 
     
-
+    # returns the area and shape of the particle specified by particleID
     def freeSpace(self,particleID):
-        # return 0 for particles outside the window
+        # return 0 for particles that shouldn't be counted
         if not self.countParticle[particleID-1]:
             return 0
 
         center = self.particleCenters[particleID-1]
         nns = self.neighbs[center]
 
-        crossingPts = [] #(x,y)
-        crossingPairs = [] #(circle1,circle2)
+        # (x,y) for crossing points between neighbors' excl area circles
+        crossingPts = [] 
+        # (circle1,circle2) specifying, for each entry in crossingPts, which neighbors' circles are crossing
+        crossingPairs = [] 
 
         # go over all pairs of circles
         for i in range(len(nns)):
@@ -211,16 +211,21 @@ class Polycrystal:
                     crossingPts.append(closestCrossingPt)
                     crossingPairs.append( (i,j) )
         
+        # find the area of the polygon bounded by the crossing points
         # sortKey is a function that returns a point's angle and distance relative to center
-        # this will allow us to sort the crossing points in ccw order, which is a necessary pre-req for polyArea
+        # this allows us to sort the crossing points in ccw order, which is a necessary pre-req for polyArea
         sortKey = myGeo.make_clockwiseangle_and_distance(center)
         myArea = myGeo.polyArea(sorted(crossingPts,key=sortKey))
 
-        # go through each circle and cut out the appropriate segment
-        # this is slightly inefficient but i think its ok
+        # find the segments of excluded area that protrude into the polygon
+        # these lists will store the (x,y) points that define the free space's perimeter
         freeSpaceCurveX = []
         freeSpaceCurveY = []
+
+        # go through each excluded area circle and cut out the appropriate segment
         for i in range(len(nns)):
+
+            # find the crossing points on this circle
             myPts = []
             for j in range(len(crossingPts)):
                 if crossingPairs[j][0] == i or crossingPairs[j][1] == i:
@@ -232,12 +237,18 @@ class Polycrystal:
             if len(myPts) != 2:
                 print(particleID,"has extraneous neighbors, come fix it")
             
+            # vectors pointing from this neighbor to each crossing pt
             vec1 = (myPts[0][0]-nns[i][0],myPts[0][1]-nns[i][1])
             vec2 = (myPts[1][0]-nns[i][0],myPts[1][1]-nns[i][1])
 
+            # angle of each vector, relative to the positive x axis
             theta1 = np.arctan2(vec1[1],vec1[0])
             theta2 = np.arctan2(vec2[1],vec2[0])
 
+            # arctan2's range is [-pi,pi], meaning there's an awkward jump at pi
+            # adjust theta1, theta2 so that they do not straddle the jump
+            # i jump through all these hoops so that later on, you can plot a 
+            # pretty, continuous range of thetas between theta1 and theta2
             thetann = np.arctan2(nns[i][1]-center[1],nns[i][0]-center[0])
             if theta1 >= thetann and theta1 <= np.pi:
                 theta1 = theta1 - 2*np.pi
@@ -248,6 +259,7 @@ class Polycrystal:
             if theta2 >= -np.pi and theta2 < -2*np.pi+thetann:
                 theta2 = theta2 + 2*np.pi
 
+            # positive angle between vec1 and vec2
             theta = abs(theta1-theta2)
             # segment area = (1/2) * (theta-sin(theta)) * R^2
             segArea = 0.5 * (theta-np.sin(theta)) * 4*self.beadRad*self.beadRad
