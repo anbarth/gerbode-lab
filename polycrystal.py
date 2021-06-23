@@ -3,10 +3,6 @@ import csv
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import time
-import bisect
-import random
-import operator
-import os
 import multiprocessing as mp
 import myGeo
 import importlib
