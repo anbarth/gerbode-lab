@@ -25,7 +25,7 @@ class Polycrystal:
 
     # constructor takes the input csv file
     # windowOverride=False (default) means count up entropy for all particles in polygon window (csv line 2)
-    # windowOverride=True (useful for fake grainsplitting events) means inWindow is given line-by-line in the csv in the 3rd column
+    # windowOverride=True (useful for fake grainsplitting events) means countParticle is given line-by-line in the csv in the 3rd column
     def __init__(self,fname,neighbFile=None,windowOverride=False,radius=0):
 
         self.crystalFile = fname
@@ -34,8 +34,8 @@ class Polycrystal:
         self.windowVertices = []
         # left, right, bot, top
         self.windowDims = [10000,-10000,10000,-1000] # dummy values to start
-        # inWindow is a list of booleans, ith value says if particle i is in the window
-        self.inWindow = []
+        # countParticle is a list of booleans, ith value says if particle i is in the window
+        self.countParticle = []
 
         # read in particle centers from csv
         with open(fname) as csvFile:
@@ -87,12 +87,12 @@ class Polycrystal:
                 # col 3 optionally says if this particle should be counted when calculating S
                 # if this option is turned off, i'll just use all particles in the polygon window
                 if windowOverride:
-                    self.inWindow.append(bool(int(row[3])))
+                    self.countParticle.append(bool(int(row[3])))
 
         # decide which beads are in the window and outside the window
         if not windowOverride:
             windowPath = path.Path(self.windowVertices)
-            self.inWindow = windowPath.contains_points(self.particleCenters)
+            self.countParticle = windowPath.contains_points(self.particleCenters)
 
         # read in neighbors
         if neighbFile == None:
@@ -120,7 +120,7 @@ class Polycrystal:
                 sortKey = myGeo.make_clockwiseangle_and_distance(p)
                 self.neighbs[p] = sorted(myNeighbs,key=sortKey)
     
-    def showGrid(self):
+    def show(self):
         fig, ax = plt.subplots()
         ax.set_aspect(1)
 
@@ -129,7 +129,7 @@ class Polycrystal:
             circ = plt.Circle(p, self.beadRad, facecolor='gray',edgecolor=None, alpha=0.3)
             ax.add_artist(circ)
     
-            if self.inWindow[i]:
+            if self.countParticle[i]:
                 circ = plt.Circle(p, self.beadRad/10, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
                 #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
@@ -151,7 +151,7 @@ class Polycrystal:
             circ = plt.Circle(q, self.beadRad, facecolor='gray',edgecolor=None, alpha=0.3)
             ax.add_artist(circ)
     
-            if self.inWindow[i]:
+            if self.countParticle[i]:
                 circ = plt.Circle(q, self.beadRad/20, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
             
@@ -174,7 +174,7 @@ class Polycrystal:
 
     def freeSpace(self,particleID):
         # return 0 for particles outside the window
-        if not self.inWindow[particleID-1]:
+        if not self.countParticle[particleID-1]:
             return 0
 
         center = self.particleCenters[particleID-1]
@@ -328,7 +328,7 @@ class Polycrystal:
                 ax.add_artist(circ)
 
                 # don't count particles that are outside the window
-                if not self.inWindow[i]:
+                if not self.countParticle[i]:
                     continue
                 numParts += 1
 
@@ -390,7 +390,7 @@ class Polycrystal:
                 p = self.particleCenters[i]
 
                 # don't count particles that are outside the window
-                if not self.inWindow[i]:
+                if not self.countParticle[i]:
                     continue
                 
                 numParts += 1
@@ -422,7 +422,7 @@ class Polycrystal:
             p = self.particleCenters[i]
 
             # don't count particles that are outside the window
-            if self.inWindow[i]:
+            if self.countParticle[i]:
                 particlesInGrid.append(i+1)
 
         numParts = len(particlesInGrid)
@@ -447,7 +447,16 @@ class Polycrystal:
 
         return [S,numParts,toc-tic]
 
-   
+    def areaFraction(self):  
+        # area occupied = N pi r^2
+        # TODO this isn't accounting for particles that fall partially outside the window
+        windowPath = path.Path(self.windowVertices)
+        inWindow = windowPath.contains_points(self.particleCenters)
+        numParts = sum(inWindow)
+        areaOccupied = numParts*np.pi*self.beadRad*self.beadRad
+        totalArea = myGeo.polyArea(self.windowVertices)
+        return areaOccupied/totalArea
+    
 
 def dist(p1,p2):
     (x1,y1) = p1
