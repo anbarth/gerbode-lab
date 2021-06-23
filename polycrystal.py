@@ -305,7 +305,7 @@ class Polycrystal:
         return freeArea
 
 
-    def entropyDraw(self,sbeadFile=None,imgFile=None):
+    def entropy(self,sbeadFile=None,imgFile=None):
         tic = time.time()
         fig, ax = plt.subplots()
         ax.set_aspect(1)
@@ -368,48 +368,13 @@ class Polycrystal:
                 ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=rgb,edgecolor='black',lw=0.15)
                 #ax.fill(biggerCurveX,biggerCurveY, facecolor=rgb,edgecolor='black',lw=0.5,zorder=5)
         
-        #0.034 to 0.023
 
-        #pickle.dump(fig, open('Banana.fig.pickle', 'wb'))
         fig.savefig(imgFile, dpi=900)
         plt.close(fig)
         toc = time.time()
         return [S,numParts,toc-tic]
 
-    def entropy(self,sbeadFile=None):
-        tic = time.time()
-
-        # generate an Sbead file name, if none provided
-        i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
-        nameRoot = self.crystalFile[i+1:-4]
-        if sbeadFile == None:
-            sbeadFile = nameRoot+'_Sbead.csv'
-
-
-        S = 0 # total S
-        numParts = 0 # number of particles counted
-        buffer = self.beadRad*2
-
-        with open(sbeadFile,'w',newline='') as sbeadFileObj:
-            writer = csv.writer(sbeadFileObj)
-
-            for i in range(len(self.particleCenters)):
-                
-                p = self.particleCenters[i]
-
-                # don't count particles that are outside the window
-                if not self.countParticle[i]:
-                    continue
-                
-                numParts += 1
-
-                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i+1)
-                Si = np.log(freeArea)
-                S += Si
-                writer.writerow([pID,Si])
-
-        toc = time.time()
-        return [S,numParts,toc-tic]
+    
 
     def entropyParallel(self,numProc,sbeadFile=None):
         tic = time.time()
