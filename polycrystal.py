@@ -152,7 +152,7 @@ class Polycrystal:
             plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
 
         for (x,y) in self.neighbs[p]:
-            circ = plt.Circle((x,y), 2*self.beadRad, facecolor=(0, 0, 0, 0),edgecolor='r')
+            circ = plt.Circle((x,y), 2*self.beadRad, facecolor=(1, 0, 0, 0.1),edgecolor='r')
             ax.add_artist(circ)
 
         myLeft = min([x for (x,y) in self.neighbs[p]])
@@ -211,6 +211,54 @@ class Polycrystal:
                     crossingPts.append(closestCrossingPt)
                     crossingPairs.append( (i,j) )
         
+        # check for and correct nearest neighbor network issues
+        for i in range(len(nns)):
+            # find the crossing points on this circle
+            myPtInds = []
+            for j in range(len(crossingPts)):
+                if crossingPairs[j][0] == i or crossingPairs[j][1] == i:
+                    myPtInds.append(j)
+
+            # there's an issue if there's >2 crossing points
+            if len(myPtInds) <= 2:
+                continue
+            
+            print(particleID,"has extraneous neighbors. i tried taking care of it but you should check with your superior human eyeballs")
+            
+            # find the two crossing points closest to the particle's center
+            crossingPtInd1 = -1
+            crossingPtInd2 = -1
+            crossingPtDist1 = np.inf
+            crossingPtDist2 = np.inf
+            for j in myPtInds:
+                myDist = dist(crossingPts[j],center)
+                if myDist < crossingPtDist1:
+                    crossingPtInd2 = crossingPtInd1
+                    crossingPtDist2 = crossingPtDist1
+                    crossingPtInd1 = j
+                    crossingPtDist1 = myDist
+                elif myDist < crossingPtDist2:
+                    crossingPtInd2 = j
+                    crossingPtDist2 = myDist
+
+            # now, get rid of all the crossing points except the closest two
+            for j in myPtInds:
+                if j != crossingPtInd1 and j != crossingPtInd2:
+                    crossingPts = np.delete(crossingPts,j,0)
+                    crossingPairs = np.delete(crossingPairs,j,0)
+
+        # check for stragglers
+        for i in range(len(nns)):
+            # find the crossing points on this circle
+            myPtInds = []
+            for j in range(len(crossingPts)):
+                if crossingPairs[j][0] == i or crossingPairs[j][1] == i:
+                    myPtInds.append(j)
+
+            if len(myPtInds) == 1:
+                crossingPts = np.delete(crossingPts,j,0)
+                crossingPairs = np.delete(crossingPairs,j,0)
+
         # find the area of the polygon bounded by the crossing points
         # first, find a point (x_inside, y_inside) that is inside the polygon
         x_inside = np.average([crossPt[0] for crossPt in crossingPts])
@@ -235,11 +283,11 @@ class Polycrystal:
                     myPts.append(crossingPts[j])
             
             # i expect to always find 0 or 2 crossing points
-            if len(myPts) == 0:
+            if len(myPts) == 0: 
                 continue
-            if len(myPts) != 2:
-                print(particleID,"has extraneous neighbors, come fix it")
-            
+            if len(myPts) != 2 or len(myPts) == 1:
+                print(particleID,"somehow still has an issue, come fix it")
+
             # vectors pointing from this neighbor to each crossing pt
             vec1 = (myPts[0][0]-nns[i][0],myPts[0][1]-nns[i][1])
             vec2 = (myPts[1][0]-nns[i][0],myPts[1][1]-nns[i][1])
@@ -264,7 +312,6 @@ class Polycrystal:
 
             # positive angle between vec1 and vec2
             theta = abs(theta1-theta2)
-
             # segment area = (1/2) * (theta-sin(theta)) * R^2
             segArea = 0.5 * (theta-np.sin(theta)) * 4*self.beadRad*self.beadRad
             myArea = myArea - segArea
@@ -272,7 +319,7 @@ class Polycrystal:
             # add segment points to freeSpaceCurve
             thetaMin = min(theta1,theta2)
             thetaMax = max(theta1,theta2)
-            numSteps = int( (thetaMax-thetaMin)/(np.pi/180) ) # number of steps st every step covers 1 degree
+            numSteps = 50 # idk just some number i like
 
             freeSpaceCurveX.extend([nns[i][0]+2*self.beadRad*np.cos(t) for t in np.linspace(thetaMin,thetaMax,numSteps)])
             freeSpaceCurveY.extend([nns[i][1]+2*self.beadRad*np.sin(t) for t in np.linspace(thetaMin,thetaMax,numSteps)])
@@ -313,8 +360,8 @@ class Polycrystal:
         tic = time.time()
         fig, ax = plt.subplots()
         ax.set_aspect(1)
-        plt.xlim(140,460)
-        plt.ylim(140,460)
+        #plt.xlim(140,460)
+        #plt.ylim(140,460)
 
         # generate an Sbead file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
