@@ -212,9 +212,12 @@ class Polycrystal:
                     crossingPairs.append( (i,j) )
         
         # find the area of the polygon bounded by the crossing points
-        # sortKey is a function that returns a point's angle and distance relative to center
+        # first, find a point (x_inside, y_inside) that is inside the polygon
+        x_inside = np.average([crossPt[0] for crossPt in crossingPts])
+        y_inside = np.average([crossPt[1] for crossPt in crossingPts])
+        # now define sortKey, a function that returns a point's angle and distance relative to (x_inside,y_inside)
         # this allows us to sort the crossing points in ccw order, which is a necessary pre-req for polyArea
-        sortKey = myGeo.make_clockwiseangle_and_distance(center)
+        sortKey = myGeo.make_clockwiseangle_and_distance((x_inside,y_inside))
         myArea = myGeo.polyArea(sorted(crossingPts,key=sortKey))
 
         # find the segments of excluded area that protrude into the polygon
@@ -261,6 +264,7 @@ class Polycrystal:
 
             # positive angle between vec1 and vec2
             theta = abs(theta1-theta2)
+
             # segment area = (1/2) * (theta-sin(theta)) * R^2
             segArea = 0.5 * (theta-np.sin(theta)) * 4*self.beadRad*self.beadRad
             myArea = myArea - segArea
@@ -309,8 +313,8 @@ class Polycrystal:
         tic = time.time()
         fig, ax = plt.subplots()
         ax.set_aspect(1)
-        #plt.xlim(140,460)
-        #plt.ylim(140,460)
+        plt.xlim(140,460)
+        plt.ylim(140,460)
 
         # generate an Sbead file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
@@ -347,9 +351,9 @@ class Polycrystal:
                 # find the free area -- note that particleID = i+1 !!
                 (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i+1)
 
-                if freeArea == 0:
+                if freeArea <= 0:
                     Si = 0
-                    print("free area appears to be 0 for "+str(i+1)+", go check it out")
+                    print("free area appears to be 0 or negative for "+str(i+1)+", go check it out")
                 else:
                     Si = np.log(freeArea)
 
@@ -358,14 +362,14 @@ class Polycrystal:
                 writer.writerow([pID,freeArea]) # record in Sbead file
 
                 # draw free area
-                # pick a color (freeArea = 0 --> blue; freeArea >= pi R^2/6 --> yellow)
-                # cmap takes a number 0 to 1
+                # cmap takes a number in [0,1) to a color
                 rgb = cmap((freeArea-0.035)*6.9)[0:3]
-                #print(freeArea)
+                ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=rgb,edgecolor='black',lw=0.15)
+
+                # to plot free space at 3x its size, use this code instead
                 #cen = centroid(freeSpaceCurveX,freeSpaceCurveY)
                 #biggerCurveX = 3*(np.array(freeSpaceCurveX)-cen[0])+cen[0]
                 #biggerCurveY = 3*(np.array(freeSpaceCurveY)-cen[1])+cen[1]
-                ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=rgb,edgecolor='black',lw=0.15)
                 #ax.fill(biggerCurveX,biggerCurveY, facecolor=rgb,edgecolor='black',lw=0.5,zorder=5)
         
 
