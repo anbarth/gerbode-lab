@@ -49,7 +49,7 @@ class Polycrystal:
                         print("warning: row 2 should have an even number of entries, it doesn't")
                     for i in range(int(len(row)/2)):
                         myX = float(row[2*i])
-                        myY = float(row[2*i+1])
+                        myY = -1*float(row[2*i+1])
                         self.windowVertices.append((myX,myY))
 
                         # adjust window bounds:
@@ -75,7 +75,7 @@ class Polycrystal:
 
                 # col 1 and 2 are (x,y) position
                 p = ( (float(row[1])) , 
-                      (float(row[2])) )
+                      (-1*float(row[2])) )
                 self.particleCenters.append(p)
                 
                 # col 3 optionally says if this particle should be counted when calculating S
@@ -99,21 +99,29 @@ class Polycrystal:
         with open(neighbFile) as csvFile:
             reader = csv.reader(csvFile, delimiter=',')
             for row in reader:
-                # TODO its super confusing that matlab IDs are pID+1 :(
+   
                 # first element gives the particles whomst neighbors we will see
                 partID = int(row[0])
-                p = self.particleCenters[partID-1]
                 
                 # subsequent elements are that particle's neighbors
                 myNeighbs = []
                 for i in range(1,len(row)):
-                    myNeighbs.append(self.particleCenters[int(row[i])-1])
+                    myNeighbs.append(int(row[i]))
 
                 # sortKey is a function that returns a point's angle and distance relative to p
                 # this will allow us to sort the neighbors in ccw order, which is convenient in freeSpace
-                sortKey = myGeo.make_clockwiseangle_and_distance(p)
-                self.neighbs[p] = sorted(myNeighbs,key=sortKey)
+                #sortKey = myGeo.make_clockwiseangle_and_distance(p)
+                # TODO is it ok that i killed this feature
+                self.neighbs[partID] = myNeighbs
     
+    def foo(self):
+        for i in range(len(self.particleCenters)):
+            for j in range(i+1,len(self.particleCenters)):
+                myR = dist(self.particleCenters[i],self.particleCenters[j])/2
+                if myR <= 11:
+                    print(i+1,j+1,myR)
+
+
     def show(self):
         fig, ax = plt.subplots()
         ax.set_aspect(1)
@@ -126,11 +134,11 @@ class Polycrystal:
             if self.countParticle[i]:
                 circ = plt.Circle(p, self.beadRad/10, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
-                #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
+            
+            plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
 
         plt.xlim(self.windowDims[0],self.windowDims[1])
         plt.ylim(self.windowDims[2],self.windowDims[3])
-
 
         plt.show()
 
@@ -166,7 +174,9 @@ class Polycrystal:
 
     
     # returns the area and shape of the particle specified by particleID
-    def freeSpace(self,particleID):
+    def freeSpace(self,particleID,imgMaking=False):
+        thisWentSmoothly = True
+
         # return 0 for particles that shouldn't be counted
         if not self.countParticle[particleID-1]:
             return 0
@@ -223,8 +233,10 @@ class Polycrystal:
             if len(myPtInds) <= 2:
                 continue
             
-            print(particleID,"has extraneous neighbors. i tried taking care of it but you should check with your superior human eyeballs")
-            
+            if thisWentSmoothly:
+                print(particleID,"has extraneous neighbors. i tried taking care of it but you should check with your superior human eyeballs")
+                thisWentSmoothly = False
+
             # find the two crossing points closest to the particle's center
             crossingPtInd1 = -1
             crossingPtInd2 = -1
@@ -287,6 +299,7 @@ class Polycrystal:
                 continue
             if len(myPts) != 2 or len(myPts) == 1:
                 print(particleID,"somehow still has an issue, come fix it")
+                thisWentSmoothly = False
 
             # vectors pointing from this neighbor to each crossing pt
             vec1 = (myPts[0][0]-nns[i][0],myPts[0][1]-nns[i][1])
@@ -327,13 +340,33 @@ class Polycrystal:
         freeArea = myArea/(np.pi*self.beadRad*self.beadRad)
         if freeArea > 0.5:
             print(particleID,"has rather large free area, worth checking out")
+            thisWentSmoothly = False
 
-        return [particleID,myArea/(np.pi*self.beadRad*self.beadRad),freeSpaceCurveX,freeSpaceCurveY]
+        if not(thisWentSmoothly) and imgMaking:
+            fig, ax = plt.subplots()
+            ax.set_aspect(1)
+
+            plt.scatter(center[0],center[1])
+
+            for i in range(len(self.particleCenters)):
+                q = self.particleCenters[i]
+                plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
+
+            for nn in nns:
+                plt.scatter(nn[0],nn[1])
+                circ = plt.Circle(nn, 2*self.beadRad, color='gray', alpha=0.3)
+                ax.add_artist(circ)
+
+            plt.plot(freeSpaceCurveX,freeSpaceCurveY)
+            fig.savefig("freespace_"+str(particleID)+".png", dpi=900)
 
 
-    def drawFreeSpace(self,particleID):
+        return [particleID,myArea/(np.pi*self.beadRad*self.beadRad),freeSpaceCurveX,freeSpaceCurveY,thisWentSmoothly]
+
+
+    def drawFreeSpace(self,particleID,show=True,save=False):
         p = self.particleCenters[particleID-1]
-        (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(particleID)
+        (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY,thisWentSmoothly) = self.freeSpace(particleID)
 
         fig, ax = plt.subplots()
         ax.set_aspect(1)
@@ -353,7 +386,33 @@ class Polycrystal:
 
         plt.plot(freeSpaceCurveX,freeSpaceCurveY)
         plt.show()
+        plt.close(fig)
         return freeArea
+
+    def freeSpaceHandleExceptions(self,particleID):
+        p = self.particleCenters[particleID-1]
+        (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY,thisWentSmoothly) = self.freeSpace(particleID)
+
+        if not(thisWentSmoothly):
+            fig, ax = plt.subplots()
+            ax.set_aspect(1)
+
+            plt.scatter(p[0],p[1])
+
+            for i in range(len(self.particleCenters)):
+                q = self.particleCenters[i]
+                plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
+
+            for nn in self.neighbs[p]:
+                plt.scatter(nn[0],nn[1])
+                circ = plt.Circle(nn, 2*self.beadRad, color='gray', alpha=0.3)
+                ax.add_artist(circ)
+
+            plt.plot(freeSpaceCurveX,freeSpaceCurveY)
+            fig.savefig("freespace_"+str(particleID)+".png", dpi=900)
+
+        return [particleID,freeArea,freeSpaceCurveX,freeSpaceCurveY]
+
 
 
     def entropy(self,sbeadFile=None,imgFile=None):
@@ -396,7 +455,7 @@ class Polycrystal:
                 ax.add_artist(circ) 
 
                 # find the free area -- note that particleID = i+1 !!
-                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i+1)
+                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY,aa) = self.freeSpace(i+1)
 
                 if freeArea <= 0:
                     Si = 0
