@@ -361,7 +361,11 @@ class Polycrystal:
                 ax.add_artist(circ)
 
             plt.plot(freeSpaceCurveX,freeSpaceCurveY)
-            fig.savefig("freespace_"+str(particleID)+".png", dpi=900)
+
+            strPos = self.crystalFile.rfind('/') # chop off any part of the name before a slash
+            nameRoot = self.crystalFile[strPos+1:-4]
+            myFileName = "badFreeSpace/"+nameRoot+"_freespace_"+str(particleID)+".png"
+            fig.savefig(myFileName, dpi=900)
 
 
         return [particleID,myArea/(np.pi*self.beadRad*self.beadRad),freeSpaceCurveX,freeSpaceCurveY,thisWentSmoothly]
@@ -401,9 +405,9 @@ class Polycrystal:
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
         nameRoot = self.crystalFile[i+1:-4]
         if sbeadFile == None:
-            sbeadFile = nameRoot+'_freeSpaces.csv'
+            sbeadFile = 'freeSpaceCSVs/'+nameRoot+'_freeSpaces.csv'
         if imgFile == None:
-            imgFile = nameRoot+'_snowflakes.png'
+            imgFile = 'snowflakes/'+nameRoot+'_snowflakes.png'
         cmap = cm.get_cmap('viridis')
 
         S = 0 # total S
