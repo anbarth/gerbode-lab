@@ -110,9 +110,9 @@ class Polycrystal:
 
                 # sortKey is a function that returns a point's angle and distance relative to p
                 # this will allow us to sort the neighbors in ccw order, which is convenient in freeSpace
-                #sortKey = myGeo.make_clockwiseangle_and_distance(p)
-                # TODO is it ok that i killed this feature
-                self.neighbs[partID] = myNeighbs
+                sortKey = self.make_clockwiseangle_and_distance_byID(partID)
+                self.neighbs[partID] = sorted(myNeighbs,key=sortKey)
+                
     
     def foo(self):
         for i in range(len(self.particleCenters)):
@@ -135,7 +135,7 @@ class Polycrystal:
                 circ = plt.Circle(p, self.beadRad/10, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
             
-            plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
+            #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
 
         plt.xlim(self.windowDims[0],self.windowDims[1])
         plt.ylim(self.windowDims[2],self.windowDims[3])
@@ -144,7 +144,7 @@ class Polycrystal:
 
 
     def showNeighbors(self,pID):
-        p = self.particleCenters[pID-1]
+
         fig, ax = plt.subplots()
         ax.set_aspect(1)
         
@@ -156,17 +156,22 @@ class Polycrystal:
             if self.countParticle[i]:
                 circ = plt.Circle(q, self.beadRad/20, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
-            
-            plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
 
-        for (x,y) in self.neighbs[p]:
+        # keep track of neighbors' positions just so i know how big to make the window
+        x_list = []
+        y_list = []    
+        for nnID in self.neighbs[pID]:
+            (x,y) = self.particleCenters[nnID-1]
+            x_list.append(x)
+            y_list.append(y)
             circ = plt.Circle((x,y), 2*self.beadRad, facecolor=(1, 0, 0, 0.1),edgecolor='r')
             ax.add_artist(circ)
+            plt.text(x+self.beadRad/15,y+self.beadRad/15,str(nnID))
 
-        myLeft = min([x for (x,y) in self.neighbs[p]])
-        myRight = max([x for (x,y) in self.neighbs[p]])
-        myBot = min([y for (x,y) in self.neighbs[p]])
-        myTop = max([y for (x,y) in self.neighbs[p]])
+        myLeft = min(x_list)
+        myRight = max(x_list)
+        myBot = min(y_list)
+        myTop = max(y_list)
 
         plt.xlim(myLeft-self.beadRad,myRight+self.beadRad)
         plt.ylim(myBot-self.beadRad,myTop+self.beadRad)
@@ -182,7 +187,8 @@ class Polycrystal:
             return 0
 
         center = self.particleCenters[particleID-1]
-        nns = self.neighbs[center]
+        nnIDs = self.neighbs[particleID]
+        nns = [self.particleCenters[nnID-1] for nnID in nnIDs]
 
         # (x,y) for crossing points between neighbors' excl area circles
         crossingPts = [] 
@@ -191,8 +197,7 @@ class Polycrystal:
 
         # go over all pairs of circles
         for i in range(len(nns)):
-            for j in range(i+1,len(nns)):
-                
+            for j in range(i+1,len(nns)): 
                 myCrossingPts = myGeo.circIntersections(nns[i][0], nns[i][1], 2*self.beadRad, \
                                                         nns[j][0], nns[j][1], 2*self.beadRad)
                 
@@ -347,14 +352,12 @@ class Polycrystal:
             ax.set_aspect(1)
 
             plt.scatter(center[0],center[1])
+            plt.text(center[0]+self.beadRad/15,center[1]+self.beadRad/15,str(particleID))
 
-            for i in range(len(self.particleCenters)):
-                q = self.particleCenters[i]
-                plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
-
-            for nn in nns:
-                plt.scatter(nn[0],nn[1])
-                circ = plt.Circle(nn, 2*self.beadRad, color='gray', alpha=0.3)
+            for i in range(len(nns)):
+                plt.scatter(nns[i][0],nns[i][1])
+                plt.text(nns[i][0]+self.beadRad/15,nns[i][1]+self.beadRad/15,str(nnIDs[i]))
+                circ = plt.Circle(nns[i], 2*self.beadRad, color='gray', alpha=0.3)
                 ax.add_artist(circ)
 
             plt.plot(freeSpaceCurveX,freeSpaceCurveY)
@@ -372,16 +375,13 @@ class Polycrystal:
         ax.set_aspect(1)
 
         plt.scatter(p[0],p[1])
-        #circ = plt.Circle(p, self.beadRad, color='gray', alpha=0.3)
-        #ax.add_artist(circ)
 
-        for i in range(len(self.particleCenters)):
-            q = self.particleCenters[i]
-            plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
-
-        for nn in self.neighbs[p]:
-            plt.scatter(nn[0],nn[1])
-            circ = plt.Circle(nn, 2*self.beadRad, color='gray', alpha=0.3)
+        nnIDs = self.neighbs[particleID]
+        nns = [self.particleCenters[nnID-1] for nnID in nnIDs]
+        for i in range(len(nns)):
+            plt.scatter(nns[i][0],nns[i][1])
+            plt.text(nns[i][0]+self.beadRad/15,nns[i][1]+self.beadRad/15,str(nnIDs[i]))
+            circ = plt.Circle(nns[i], 2*self.beadRad, color='gray', alpha=0.3)
             ax.add_artist(circ)
 
         plt.plot(freeSpaceCurveX,freeSpaceCurveY)
@@ -389,32 +389,7 @@ class Polycrystal:
         plt.close(fig)
         return freeArea
 
-    def freeSpaceHandleExceptions(self,particleID):
-        p = self.particleCenters[particleID-1]
-        (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY,thisWentSmoothly) = self.freeSpace(particleID)
-
-        if not(thisWentSmoothly):
-            fig, ax = plt.subplots()
-            ax.set_aspect(1)
-
-            plt.scatter(p[0],p[1])
-
-            for i in range(len(self.particleCenters)):
-                q = self.particleCenters[i]
-                plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
-
-            for nn in self.neighbs[p]:
-                plt.scatter(nn[0],nn[1])
-                circ = plt.Circle(nn, 2*self.beadRad, color='gray', alpha=0.3)
-                ax.add_artist(circ)
-
-            plt.plot(freeSpaceCurveX,freeSpaceCurveY)
-            fig.savefig("freespace_"+str(particleID)+".png", dpi=900)
-
-        return [particleID,freeArea,freeSpaceCurveX,freeSpaceCurveY]
-
-
-
+    
     def entropy(self,sbeadFile=None,imgFile=None):
         tic = time.time()
         fig, ax = plt.subplots()
@@ -455,7 +430,7 @@ class Polycrystal:
                 ax.add_artist(circ) 
 
                 # find the free area -- note that particleID = i+1 !!
-                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY,aa) = self.freeSpace(i+1)
+                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY,aa) = self.freeSpace(i+1,imgMaking=True)
 
                 if freeArea <= 0:
                     Si = 0
@@ -540,6 +515,36 @@ class Polycrystal:
         totalArea = myGeo.polyArea(self.windowVertices)
         return areaOccupied/totalArea
     
+    # im so sorry this god-awful function exists twice in my code base
+    # it's once here and there's also an extremely similar function in myGeo
+    # the myGeo one is older and doesn't really need to exist if this one's here
+    # i would rather this ugly thing be in myGeo, where i don't have to look at it
+    # but i can't figure out how to sort neighbors in ccw without this here
+    def make_clockwiseangle_and_distance_byID(self,originID):
+        origin = self.particleCenters[originID-1]
+        def clockwiseangle_and_distance_byID(pID):
+            refvec = [0,1]
+            # Vector between point and the origin: v = p - o
+            point = self.particleCenters[pID-1]
+            vector = [point[0]-origin[0], point[1]-origin[1]]
+            # Length of vector: ||v||
+            lenvector = np.hypot(vector[0], vector[1])
+            # If length is zero there is no angle
+            if lenvector == 0:
+                return (-np.pi, 0)
+            # Normalize vector: v/||v||
+            normalized = [vector[0]/lenvector, vector[1]/lenvector]
+            dotprod  = normalized[0]*refvec[0] + normalized[1]*refvec[1]     # x1*x2 + y1*y2
+            diffprod = refvec[1]*normalized[0] - refvec[0]*normalized[1]     # x1*y2 - y1*x2
+            angle = np.arctan2(diffprod, dotprod)
+            # Negative angles represent counter-clockwise angles so we need to subtract them 
+            # from 2*pi (360 degrees)
+            if angle < 0:
+                return 2*np.pi+angle, lenvector
+            # I return first the angle because that's the primary sorting criterium
+            # but if two vectors have the same angle then the shorter distance should come first.
+            return angle, lenvector
+        return clockwiseangle_and_distance_byID
 
 def dist(p1,p2):
     (x1,y1) = p1
