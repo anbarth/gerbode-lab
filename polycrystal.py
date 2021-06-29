@@ -6,6 +6,7 @@ import time
 import multiprocessing as mp
 import myGeo
 import importlib
+import os
 from matplotlib import path
 importlib.reload(myGeo)
 
@@ -49,7 +50,7 @@ class Polycrystal:
                         print("warning: row 2 should have an even number of entries, it doesn't")
                     for i in range(int(len(row)/2)):
                         myX = float(row[2*i])
-                        myY = -1*float(row[2*i+1])
+                        myY = float(row[2*i+1])
                         self.windowVertices.append((myX,myY))
 
                         # adjust window bounds:
@@ -75,7 +76,7 @@ class Polycrystal:
 
                 # col 1 and 2 are (x,y) position
                 p = ( (float(row[1])) , 
-                      (-1*float(row[2])) )
+                      (float(row[2])) )
                 self.particleCenters.append(p)
                 
                 # col 3 optionally says if this particle should be counted when calculating S
@@ -132,7 +133,7 @@ class Polycrystal:
             ax.add_artist(circ)
     
             if self.countParticle[i]:
-                circ = plt.Circle(p, self.beadRad/10, facecolor='k', edgecolor=None)
+                circ = plt.Circle(p, self.beadRad/5, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
             
             #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
@@ -141,6 +142,9 @@ class Polycrystal:
         plt.ylim(self.windowDims[2],self.windowDims[3])
 
         plt.show()
+        strPos = self.crystalFile.rfind('/') # chop off any part of the name before a slash
+        nameRoot = self.crystalFile[strPos+1:-4]
+        fig.savefig(nameRoot+"_img.png",dpi=900)
 
 
     def showNeighbors(self,pID):
@@ -164,7 +168,7 @@ class Polycrystal:
             (x,y) = self.particleCenters[nnID-1]
             x_list.append(x)
             y_list.append(y)
-            circ = plt.Circle((x,y), 2*self.beadRad, facecolor=(1, 0, 0, 0.1),edgecolor='r')
+            circ = plt.Circle((x,y), 2*self.beadRad, facecolor=(1, 0, 0, 0.25),edgecolor='r')
             ax.add_artist(circ)
             plt.text(x+self.beadRad/15,y+self.beadRad/15,str(nnID))
 
@@ -276,6 +280,10 @@ class Polycrystal:
                 crossingPts = np.delete(crossingPts,j,0)
                 crossingPairs = np.delete(crossingPairs,j,0)
 
+        if len(crossingPts) == 0:
+            print("free area appears to be 0 or negative for "+str(particleID)+", go check it out")
+            return [particleID,0,[center[0]],[center[1]]]
+
         # find the area of the polygon bounded by the crossing points
         # first, find a point (x_inside, y_inside) that is inside the polygon
         x_inside = np.average([crossPt[0] for crossPt in crossingPts])
@@ -351,44 +359,57 @@ class Polycrystal:
             fig, ax = plt.subplots()
             ax.set_aspect(1)
 
-            plt.scatter(center[0],center[1])
+            circ = plt.Circle(center, self.beadRad/60, color='black')
+            ax.add_artist(circ)
             plt.text(center[0]+self.beadRad/15,center[1]+self.beadRad/15,str(particleID))
 
             for i in range(len(nns)):
-                plt.scatter(nns[i][0],nns[i][1])
+                circ = plt.Circle(nns[i], self.beadRad/60, color='black')
+                ax.add_artist(circ)
                 plt.text(nns[i][0]+self.beadRad/15,nns[i][1]+self.beadRad/15,str(nnIDs[i]))
                 circ = plt.Circle(nns[i], 2*self.beadRad, color='gray', alpha=0.3)
                 ax.add_artist(circ)
 
             plt.plot(freeSpaceCurveX,freeSpaceCurveY)
+            plt.xlim(min(freeSpaceCurveX)-self.beadRad/3,max(freeSpaceCurveX)+self.beadRad/3)
+            plt.ylim(min(freeSpaceCurveY)-self.beadRad/3,max(freeSpaceCurveY)+self.beadRad/3)
 
-            strPos = self.crystalFile.rfind('/') # chop off any part of the name before a slash
+            strPos = self.crystalFile.find('/') # chop off any part of the name before a slash
             nameRoot = self.crystalFile[strPos+1:-4]
             myFileName = "badFreeSpace/"+nameRoot+"_freespace_"+str(particleID)+".png"
-            fig.savefig(myFileName, dpi=900)
+            try:
+                fig.savefig(myFileName, dpi=900)
+            except FileNotFoundError:
+                strPos = nameRoot.rfind('/')
+                os.mkdir("badFreeSpace/"+nameRoot[0:strPos])
+                fig.savefig(myFileName, dpi=900)
 
 
-        return [particleID,myArea/(np.pi*self.beadRad*self.beadRad),freeSpaceCurveX,freeSpaceCurveY,thisWentSmoothly]
+        return [particleID,myArea/(np.pi*self.beadRad*self.beadRad),freeSpaceCurveX,freeSpaceCurveY]
 
 
     def drawFreeSpace(self,particleID,show=True,save=False):
         p = self.particleCenters[particleID-1]
-        (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY,thisWentSmoothly) = self.freeSpace(particleID)
+        (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(particleID)
 
         fig, ax = plt.subplots()
         ax.set_aspect(1)
 
-        plt.scatter(p[0],p[1])
+        circ = plt.Circle(p, self.beadRad/60, color='black')
+        ax.add_artist(circ)
 
         nnIDs = self.neighbs[particleID]
         nns = [self.particleCenters[nnID-1] for nnID in nnIDs]
         for i in range(len(nns)):
-            plt.scatter(nns[i][0],nns[i][1])
+            circ = plt.Circle(nns[i], self.beadRad/60, color='black')
+            ax.add_artist(circ)
             plt.text(nns[i][0]+self.beadRad/15,nns[i][1]+self.beadRad/15,str(nnIDs[i]))
             circ = plt.Circle(nns[i], 2*self.beadRad, color='gray', alpha=0.3)
             ax.add_artist(circ)
 
         plt.plot(freeSpaceCurveX,freeSpaceCurveY)
+        plt.xlim(min(freeSpaceCurveX)-self.beadRad/3,max(freeSpaceCurveX)+self.beadRad/3)
+        plt.ylim(min(freeSpaceCurveY)-self.beadRad/3,max(freeSpaceCurveY)+self.beadRad/3)
         plt.show()
         plt.close(fig)
         return freeArea
@@ -398,8 +419,8 @@ class Polycrystal:
         tic = time.time()
         fig, ax = plt.subplots()
         ax.set_aspect(1)
-        #plt.xlim(140,460)
-        #plt.ylim(140,460)
+        plt.xlim(self.windowDims[0],self.windowDims[1])
+        plt.ylim(self.windowDims[2],self.windowDims[3])
 
         # generate an Sbead file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
@@ -430,15 +451,14 @@ class Polycrystal:
                 numParts += 1
 
                 # draw a black dot to indicate this particle is included
-                circ = plt.Circle(p, self.beadRad/15, facecolor='k', edgecolor=None,zorder=10)
+                circ = plt.Circle(p, self.beadRad/30, facecolor='k', edgecolor=None,zorder=10)
                 ax.add_artist(circ) 
 
                 # find the free area -- note that particleID = i+1 !!
-                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY,aa) = self.freeSpace(i+1,imgMaking=True)
+                (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i+1,imgMaking=True)
 
                 if freeArea <= 0:
                     Si = 0
-                    print("free area appears to be 0 or negative for "+str(i+1)+", go check it out")
                 else:
                     Si = np.log(freeArea)
 
@@ -448,14 +468,14 @@ class Polycrystal:
 
                 # draw free area
                 # cmap takes a number in [0,1) to a color
-                rgb = cmap((freeArea-0.035)*6.9)[0:3]
-                ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=rgb,edgecolor='black',lw=0.15)
+                rgb = cmap((freeArea)*25)[0:3]
+                #ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=rgb,edgecolor='black',lw=0.15)
 
                 # to plot free space at 3x its size, use this code instead
-                #cen = centroid(freeSpaceCurveX,freeSpaceCurveY)
-                #biggerCurveX = 3*(np.array(freeSpaceCurveX)-cen[0])+cen[0]
-                #biggerCurveY = 3*(np.array(freeSpaceCurveY)-cen[1])+cen[1]
-                #ax.fill(biggerCurveX,biggerCurveY, facecolor=rgb,edgecolor='black',lw=0.5,zorder=5)
+                cen = centroid(freeSpaceCurveX,freeSpaceCurveY)
+                biggerCurveX = 3*(np.array(freeSpaceCurveX)-cen[0])+cen[0]
+                biggerCurveY = 3*(np.array(freeSpaceCurveY)-cen[1])+cen[1]
+                ax.fill(biggerCurveX,biggerCurveY, facecolor=rgb,edgecolor='black',lw=0.15,zorder=5)
         
 
         fig.savefig(imgFile, dpi=900)
