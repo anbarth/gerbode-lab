@@ -243,9 +243,10 @@ class Polycrystal:
                 continue
             
             if thisWentSmoothly:
-                print(particleID,"has extraneous neighbors. i tried taking care of it but you should check with your superior human eyeballs")
+                print(particleID,"has extraneous neighbors")
                 thisWentSmoothly = False
-
+            #print("============")
+            #print(nnIDs[i])
             # find the two crossing points closest to the particle's center
             crossingPtInd1 = -1
             crossingPtInd2 = -1
@@ -263,12 +264,17 @@ class Polycrystal:
                     crossingPtDist2 = myDist
 
             # now, get rid of all the crossing points except the closest two
+            myPtInds = sorted(myPtInds,reverse=True) # modifying a list, so work back to front
             for j in myPtInds:
                 if j != crossingPtInd1 and j != crossingPtInd2:
+                    #print(crossingPts[j])
+                    #print(nnIDs[crossingPairs[j][0]],nnIDs[crossingPairs[j][1]])
                     crossingPts = np.delete(crossingPts,j,0)
                     crossingPairs = np.delete(crossingPairs,j,0)
 
         # check for stragglers
+        #print(crossingPairs)
+        #print(crossingPts)
         for i in range(len(nns)):
             # find the crossing points on this circle
             myPtInds = []
@@ -277,6 +283,10 @@ class Polycrystal:
                     myPtInds.append(j)
 
             if len(myPtInds) == 1:
+                j = myPtInds[0]
+                #print("straggler:")
+                #print(crossingPts[j])
+                #print(nnIDs[crossingPairs[j][0]],nnIDs[crossingPairs[j][1]])
                 crossingPts = np.delete(crossingPts,j,0)
                 crossingPairs = np.delete(crossingPairs,j,0)
 
@@ -383,7 +393,7 @@ class Polycrystal:
                 strPos = nameRoot.rfind('/')
                 os.mkdir("badFreeSpace/"+nameRoot[0:strPos])
                 fig.savefig(myFileName, dpi=900)
-
+            plt.close(fig)
 
         return [particleID,myArea/(np.pi*self.beadRad*self.beadRad),freeSpaceCurveX,freeSpaceCurveY]
 
