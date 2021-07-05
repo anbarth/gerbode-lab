@@ -9,6 +9,7 @@ import importlib
 import os
 from matplotlib import path
 importlib.reload(myGeo)
+import random
 
 class Polycrystal:
     # class fields:
@@ -504,7 +505,31 @@ class Polycrystal:
         toc = time.time()
         return [S,numParts,toc-tic]
 
-    
+    def entropyMC(self,numTrials):
+        successfulTrials = 0
+        for i in range(numTrials):
+            successfulTrials += self.MCtrial()
+        return successfulTrials/numTrials
+
+    def MCtrial(self):
+        trialCenters = []
+        for i in range(len(self.particleCenters)):
+            p = self.particleCenters[i]
+
+            # x0 and y0 are in [-2beadRad,+2beadRad)
+            x0 = random.random()*4*self.beadRad - 2*self.beadRad
+            y0 = random.random()*4*self.beadRad - 2*self.beadRad
+            
+            trialCenters.append( (p[0]+x0, p[1]+y0) )
+        
+        for pID in range(1,len(trialCenters)+1):
+            myNeighbs = self.neighbs[pID]
+            for nnID in myNeighbs:
+                if dist(trialCenters[pID-1],trialCenters[nnID-1]) < self.beadRad*2:
+                    return 0
+        
+        return 1
+
 
     def entropyParallel(self,numProc,sbeadFile=None):
         tic = time.time()
