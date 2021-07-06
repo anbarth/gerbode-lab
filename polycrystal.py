@@ -9,6 +9,7 @@ import importlib
 import os
 from matplotlib import path
 importlib.reload(myGeo)
+import random
 
 class Polycrystal:
     # class fields:
@@ -45,7 +46,7 @@ class Polycrystal:
                     lineNum += 1
                     continue
                 # second line gives polygon window
-                if lineNum == 2:
+                if lineNum == 2:                  
                     if len(row) % 2 != 0:
                         print("warning: row 2 should have an even number of entries, it doesn't")
                     for i in range(int(len(row)/2)):
@@ -81,13 +82,21 @@ class Polycrystal:
                 
                 # col 3 optionally says if this particle should be counted when calculating S
                 # if this option is turned off, i'll just use all particles in the polygon window
-                if windowOverride:
+                if windowOverride == True:
                     self.countParticle.append(bool(int(row[3])))
 
         # decide which beads are in the window and outside the window
-        if not windowOverride:
+        if windowOverride == False:
             windowPath = path.Path(self.windowVertices)
             self.countParticle = windowPath.contains_points(self.particleCenters)
+
+        # if windowOverride is a string rather than a bool, interpret it as a file that specifies who's in and who's out
+        if isinstance(windowOverride,str):
+            with open(windowOverride) as windowFile:
+                wreader = csv.reader(windowFile, delimiter=',')
+                for wrow in wreader:
+                    self.countParticle.append(bool(int(wrow[1])))
+
 
         # read in neighbors
         if neighbFile == None:
@@ -138,13 +147,15 @@ class Polycrystal:
             
             #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
 
-        plt.xlim(self.windowDims[0],self.windowDims[1])
-        plt.ylim(self.windowDims[2],self.windowDims[3])
+        plt.xlim(self.windowDims[0]-2*self.beadRad,self.windowDims[1]+2*self.beadRad)
+        plt.ylim(self.windowDims[2]-2*self.beadRad,self.windowDims[3]+2*self.beadRad)
 
         plt.show()
-        strPos = self.crystalFile.rfind('/') # chop off any part of the name before a slash
-        nameRoot = self.crystalFile[strPos+1:-4]
-        fig.savefig(nameRoot+"_img.png",dpi=900)
+        #strPos = self.crystalFile.rfind('/') # chop off any part of the name before a slash
+        #nameRoot = self.crystalFile[strPos+1:-4]
+        #fig.savefig(nameRoot+"_img.png",dpi=900)
+        plt.close(fig)
+        
 
 
     def showNeighbors(self,pID):
@@ -180,6 +191,7 @@ class Polycrystal:
         plt.xlim(myLeft-self.beadRad,myRight+self.beadRad)
         plt.ylim(myBot-self.beadRad,myTop+self.beadRad)
         plt.show()
+        plt.close(fig)
 
     
     # returns the area and shape of the particle specified by particleID
@@ -391,7 +403,7 @@ class Polycrystal:
                 fig.savefig(myFileName, dpi=900)
             except FileNotFoundError:
                 strPos = nameRoot.rfind('/')
-                os.mkdir("badFreeSpace/"+nameRoot[0:strPos])
+                os.makedirs("badFreeSpace/"+nameRoot[0:strPos])
                 fig.savefig(myFileName, dpi=900)
             plt.close(fig)
 
@@ -429,8 +441,8 @@ class Polycrystal:
         tic = time.time()
         fig, ax = plt.subplots()
         ax.set_aspect(1)
-        plt.xlim(self.windowDims[0],self.windowDims[1])
-        plt.ylim(self.windowDims[2],self.windowDims[3])
+        plt.xlim(self.windowDims[0]-2*self.beadRad,self.windowDims[1]+2*self.beadRad)
+        plt.ylim(self.windowDims[2]-2*self.beadRad,self.windowDims[3]+2*self.beadRad)
 
         # generate an Sbead file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
@@ -483,8 +495,8 @@ class Polycrystal:
 
                 # to plot free space at 3x its size, use this code instead
                 cen = centroid(freeSpaceCurveX,freeSpaceCurveY)
-                biggerCurveX = 3*(np.array(freeSpaceCurveX)-cen[0])+cen[0]
-                biggerCurveY = 3*(np.array(freeSpaceCurveY)-cen[1])+cen[1]
+                biggerCurveX = 2*(np.array(freeSpaceCurveX)-cen[0])+cen[0]
+                biggerCurveY = 2*(np.array(freeSpaceCurveY)-cen[1])+cen[1]
                 ax.fill(biggerCurveX,biggerCurveY, facecolor=rgb,edgecolor='black',lw=0.15,zorder=5)
         
 
@@ -493,7 +505,31 @@ class Polycrystal:
         toc = time.time()
         return [S,numParts,toc-tic]
 
-    
+    def entropyMC(self,numTrials):
+        successfulTrials = 0
+        for i in range(numTrials):
+            successfulTrials += self.MCtrial()
+        return successfulTrials/numTrials
+
+    def MCtrial(self):
+        trialCenters = []
+        for i in range(len(self.particleCenters)):
+            p = self.particleCenters[i]
+
+            # x0 and y0 are in [-2beadRad,+2beadRad)
+            x0 = random.random()*4*self.beadRad - 2*self.beadRad
+            y0 = random.random()*4*self.beadRad - 2*self.beadRad
+            
+            trialCenters.append( (p[0]+x0, p[1]+y0) )
+        
+        for pID in range(1,len(trialCenters)+1):
+            myNeighbs = self.neighbs[pID]
+            for nnID in myNeighbs:
+                if dist(trialCenters[pID-1],trialCenters[nnID-1]) < self.beadRad*2:
+                    return 0
+        
+        return 1
+
 
     def entropyParallel(self,numProc,sbeadFile=None):
         tic = time.time()
