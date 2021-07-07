@@ -442,8 +442,10 @@ class PolycrystalGrid:
         freePts = []
         while numTrials < maxTrials:
             # x0 and y0 are in [-2beadRad,+2beadRad)
-            x0 = random.random()*4*self.beadRad - 2*self.beadRad
-            y0 = random.random()*4*self.beadRad - 2*self.beadRad
+            #x0 = random.random()*4*self.beadRad - 2*self.beadRad
+            #y0 = random.random()*4*self.beadRad - 2*self.beadRad
+            x0 = random.random()*2*self.beadRad - self.beadRad
+            y0 = random.random()*2*self.beadRad - self.beadRad
             # reject points that are not in the circle (excluding boundary but idt it matters)
             if x0*x0 + y0*y0 >= 4*self.beadRad*self.beadRad:
                 continue

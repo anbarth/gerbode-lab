@@ -9,13 +9,13 @@ importlib.reload(polycrystal)
 
 
 
-simNames = ['jul4/r75/theta5/sim'+f'{i:02}' for i in range(1,11)]
+simNames = ['thermal/r100theta7.5/'+f'{i:02}' for i in range(1,6)]
 
 
-with open('delteme.csv','w',newline='') as dataOut:
-#with open('../grainsplits/jul4/r75theta20_10sims.csv','w',newline='') as dataOut:
+#with open('delteme.csv','w',newline='') as dataOut:
+with open('../grainsplits/thermal/r100theta7p5.csv','w',newline='') as dataOut:
     writer = csv.writer(dataOut)
-    #writer.writerow(['sim','file','timestep','S','N','F'])
+    writer.writerow(['sim','file','timestep','S','N','F (zerod)','F'])
 
     for simName in simNames:
         print("=========================")
@@ -23,7 +23,7 @@ with open('delteme.csv','w',newline='') as dataOut:
         dir = "C:\\Users\\anna2\\OneDrive\\Documents\\Gerbode\\python\\crystals\\"+simName
         step = 0
         S_0 = 0
-        #os.mkdir("../grainsplits/jul4/"+simName+"/snowflakesCircularWindowConstParticles")
+        os.mkdir("../grainsplits/"+simName+"/snowflakes")
         for filename in os.listdir(dir):  
             print(filename)  
             coll = polycrystal.Polycrystal("crystals/"+simName+"/"+filename,windowOverride=True)
@@ -31,6 +31,7 @@ with open('delteme.csv','w',newline='') as dataOut:
             [S,N,t] = coll.entropy(imgFile="../grainsplits/"+simName+"/snowflakes/"+str(filename[0:-4])+".png")
             if step == 0:
                 S_0 = S
-            F = -1*S + S_0
-            #writer.writerow([simName,filename,step,S,N,F])
+            F_z = -1*S + S_0
+            F = -1*S
+            writer.writerow([simName,filename,step,S,N,F_z,F])
             step = step+1

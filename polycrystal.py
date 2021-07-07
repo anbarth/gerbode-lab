@@ -171,6 +171,10 @@ class Polycrystal:
             if self.countParticle[i]:
                 circ = plt.Circle(q, self.beadRad/20, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
+            plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
+
+        p = self.particleCenters[pID-1]
+        #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(pID))
 
         # keep track of neighbors' positions just so i know how big to make the window
         x_list = []
