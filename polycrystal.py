@@ -11,7 +11,7 @@ importlib.reload(myGeo)
 import random
 
 ####   welcome to the polycrystal class!
-####   the primary purpose of this class is to find the free energy associated with a polycrystal
+####   the primary purpose of this class is to find the entropy associated with a polycrystal
 ####   by finding the free space available to each particle.
 ####   more details on how to use this class can be found in the README that i'm totally gonna write.
 ####   anna barth 2021
@@ -25,8 +25,8 @@ class Polycrystal:
     #   neighbs: a dictionary of each particle's nearest neighbors, stored as a list of 
     #        particle IDs and sorted in CCW order, indexed by particle ID
     #        (i.e. particle 1's nearest neighbors are neighbs[1]).
-    #   windowVertices: the vertices that define the window. particles whose centers are inside the window
-    #        will be counted when calculated entropy (unless windowOverride is on).
+    #   windowVertices: the vertices that define the window. particles whose centers are inside this polygon
+    #        will be counted when calculating entropy (unless windowOverride is on).
     #        stored as a list of (x,y) tuples in CW or CCW order.
     #   windowOverride: a boolean OR a string. if True, then we will decide which particles get counted
     #        by reading off the 4th column of the crystal csv (rather than looking at which
@@ -35,7 +35,8 @@ class Polycrystal:
     #   countParticle: a list of bools, indexed by particle ID-1, that says whether each particle
     #        should be counted when calculating entropy
     #   displayWindow: the limits of the window that should actually be displayed when making
-    #        a picture of the polycrystal. stored as a list [left, right, bot, top]
+    #        a picture of the polycrystal. stored as a list [left, right, bot, top], and determined based
+    #        on windowVertices.
 
     # ===================================================================================================   
     # =========================================== CONSTRUCTOR ===========================================
@@ -144,10 +145,18 @@ class Polycrystal:
                 for i in range(1,len(row)):
                     myNeighbs.append(int(row[i]))
 
-                # sortKey is a function that returns a point's angle and distance relative to p
-                # this will allow us to sort the neighbors in ccw order, which is convenient in freeSpace
-                sortKey = self.make_clockwiseangle_and_distance_byID(partID)
-                self.neighbs[partID] = sorted(myNeighbs,key=sortKey)
+
+                # sortKey is a function that returns a point's angle and distance relative to this particle
+                sortKey = myGeo.make_clockwiseangle_and_distance(self.particleCenters[partID-1])
+
+                # use sortKey to sort the neighbors in cw order, which is convenient in freeSpace
+                sortMe = np.array([sortKey(self.particleCenters[nnID-1]) for nnID in myNeighbs],dtype="f,f")
+                sortedIndices = np.argsort(sortMe)
+                self.neighbs[partID] = [myNeighbs[i] for i in sortedIndices]
+
+
+                    
+                    
 
     # ===================================================================================================            
     # ======================================== DISPLAY FUNCTIONS ========================================
@@ -180,7 +189,7 @@ class Polycrystal:
                 circ = plt.Circle(p, self.beadRad/5, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
                 # sometimes it's also nice to display pIDs
-                #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
+                plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
 
         plt.xlim(self.displayWindow[0]-2*self.beadRad,self.displayWindow[1]+2*self.beadRad)
         plt.ylim(self.displayWindow[2]-2*self.beadRad,self.displayWindow[3]+2*self.beadRad)
@@ -242,7 +251,7 @@ class Polycrystal:
             if self.countParticle[i]:
                 circ = plt.Circle(q, self.beadRad/20, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
-            plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
+            #plt.text(q[0]+self.beadRad/15,q[1]+self.beadRad/15,str(i+1))
 
         p = self.particleCenters[pID-1]
         #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(pID))
@@ -726,36 +735,6 @@ class Polycrystal:
     def numParts(self):
         return sum(self.countParticle)
 
-    # im so sorry this god-awful function exists twice in my code base
-    # it's once here and there's also an extremely similar function in myGeo
-    # the myGeo one is older and doesn't really need to exist if this one's here
-    # i would rather this ugly thing be in myGeo, where i don't have to look at it
-    # but i can't figure out how to sort neighbors in ccw without this here
-    def make_clockwiseangle_and_distance_byID(self,originID):
-        origin = self.particleCenters[originID-1]
-        def clockwiseangle_and_distance_byID(pID):
-            refvec = [0,1]
-            # Vector between point and the origin: v = p - o
-            point = self.particleCenters[pID-1]
-            vector = [point[0]-origin[0], point[1]-origin[1]]
-            # Length of vector: ||v||
-            lenvector = np.hypot(vector[0], vector[1])
-            # If length is zero there is no angle
-            if lenvector == 0:
-                return (-np.pi, 0)
-            # Normalize vector: v/||v||
-            normalized = [vector[0]/lenvector, vector[1]/lenvector]
-            dotprod  = normalized[0]*refvec[0] + normalized[1]*refvec[1]     # x1*x2 + y1*y2
-            diffprod = refvec[1]*normalized[0] - refvec[0]*normalized[1]     # x1*y2 - y1*x2
-            angle = np.arctan2(diffprod, dotprod)
-            # Negative angles represent counter-clockwise angles so we need to subtract them 
-            # from 2*pi (360 degrees)
-            if angle < 0:
-                return 2*np.pi+angle, lenvector
-            # I return first the angle because that's the primary sorting criterium
-            # but if two vectors have the same angle then the shorter distance should come first.
-            return angle, lenvector
-        return clockwiseangle_and_distance_byID
 
 def dist(p1,p2):
     (x1,y1) = p1
