@@ -2,7 +2,6 @@ import numpy as np
 import csv
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import time
 import multiprocessing as mp
 import myGeo
 import importlib
@@ -11,29 +10,52 @@ from matplotlib import path
 importlib.reload(myGeo)
 import random
 
+####   welcome to the polycrystal class!
+####   the primary purpose of this class is to find the free energy associated with a polycrystal
+####   by finding the free space available to each particle.
+####   more details on how to use this class can be found in the README that i'm totally gonna write.
+####   anna barth 2021
+
 class Polycrystal:
     # class fields:
-    #   xmin: minimum x value
-    #   ymin: minimum y value TODO explain these better lol
-    #   windowSize: a list that goes [width,height]. note that 0 is included and width and height are excluded.
-    #   beadRad: bead radius in px
-    #   particleCenters: 
+    #   crystalFile: the name of the csv containing a list of particle positions.
+    #   beadRad: the particle radius
+    #   particleCenters: a list of particle positions, stored as tuples,
+    #        indexed by particle ID-1 (i.e. particle 1's position is particleCenters[0]).
+    #   neighbs: a dictionary of each particle's nearest neighbors, stored as a list of 
+    #        particle IDs and sorted in CCW order, indexed by particle ID
+    #        (i.e. particle 1's nearest neighbors are neighbs[1]).
+    #   windowVertices: the vertices that define the window. particles whose centers are inside the window
+    #        will be counted when calculated entropy (unless windowOverride is on).
+    #        stored as a list of (x,y) tuples in CW or CCW order.
+    #   windowOverride: a boolean OR a string. if True, then we will decide which particles get counted
+    #        by reading off the 4th column of the crystal csv (rather than looking at which
+    #        particles fall within a certain window). if a string, it's interpreted as the name
+    #        of a csv file that says, line-by-line, which particles should get counted.
+    #   countParticle: a list of bools, indexed by particle ID-1, that says whether each particle
+    #        should be counted when calculating entropy
+    #   displayWindow: the limits of the window that should actually be displayed when making
+    #        a picture of the polycrystal. stored as a list [left, right, bot, top]
 
-    # constructor takes the input csv file
-    # windowOverride=False (default) means count up entropy for all particles in polygon window (csv line 2)
-    # windowOverride=True (useful for fake grainsplitting events) means countParticle is given line-by-line in the csv in the 3rd column
+    # ===================================================================================================   
+    # =========================================== CONSTRUCTOR ===========================================
+    # ===================================================================================================   
+
+    # input fname: the crystal csv file name
+    # optional input neighbFile: the nearest neighbor file name
+    #      (if not given, i will assume it's in the conventional spot)
+    # optinal input windowOverride: see description above
+    # optinal input radius: if provided, i'll use this instead of the value in the crystal csv
     def __init__(self,fname,neighbFile=None,windowOverride=False,radius=0):
 
         self.crystalFile = fname
         self.particleCenters = []
         self.neighbs = {}
         self.windowVertices = []
-        # left, right, bot, top
-        self.windowDims = [10000,-10000,10000,-1000] # dummy values to start
-        # countParticle is a list of booleans, ith value says if particle i is in the window
+        self.displayWindow = [10000,-10000,10000,-1000] # dummy values to start
         self.countParticle = []
 
-        # read in particle centers from csv
+        # read the crystal csv file
         with open(fname) as csvFile:
             reader = csv.reader(csvFile, delimiter=',')
             lineNum = 1
@@ -45,7 +67,7 @@ class Polycrystal:
                         self.beadRad = radius
                     lineNum += 1
                     continue
-                # second line gives polygon window
+                # second line gives polygon window as [x1,y1,x2,y2...]
                 if lineNum == 2:                  
                     if len(row) % 2 != 0:
                         print("warning: row 2 should have an even number of entries, it doesn't")
@@ -54,19 +76,19 @@ class Polycrystal:
                         myY = float(row[2*i+1])
                         self.windowVertices.append((myX,myY))
 
-                        # adjust window bounds:
+                        # adjust display window bounds:
                         # left
-                        if myX < self.windowDims[0]:
-                            self.windowDims[0] = myX
+                        if myX < self.displayWindow[0]:
+                            self.displayWindow[0] = myX
                         # right
-                        if myX > self.windowDims[1]:
-                            self.windowDims[1] = myX
+                        if myX > self.displayWindow[1]:
+                            self.displayWindow[1] = myX
                         # bot
-                        if myY < self.windowDims[2]:
-                            self.windowDims[2] = myY
+                        if myY < self.displayWindow[2]:
+                            self.displayWindow[2] = myY
                         # top
-                        if myY > self.windowDims[3]:
-                            self.windowDims[3] = myY
+                        if myY > self.displayWindow[3]:
+                            self.displayWindow[3] = myY
                     lineNum += 1
                     continue
                         
@@ -80,17 +102,16 @@ class Polycrystal:
                       (float(row[2])) )
                 self.particleCenters.append(p)
                 
-                # col 3 optionally says if this particle should be counted when calculating S
-                # if this option is turned off, i'll just use all particles in the polygon window
+                # if windowOverride is on, col 3 says if this particle should be counted when calculating S
                 if windowOverride == True:
                     self.countParticle.append(bool(int(row[3])))
 
-        # decide which beads are in the window and outside the window
+        # if windowOverride is off, decide which particles to count based on if they're inside the window
         if windowOverride == False:
             windowPath = path.Path(self.windowVertices)
             self.countParticle = windowPath.contains_points(self.particleCenters)
 
-        # if windowOverride is a string rather than a bool, interpret it as a file that specifies who's in and who's out
+        # if windowOverride is a string rather than a bool, it's a csv file that specifies who's in and who's out
         if isinstance(windowOverride,str):
             with open(windowOverride) as windowFile:
                 wreader = csv.reader(windowFile, delimiter=',')
@@ -98,19 +119,24 @@ class Polycrystal:
                     self.countParticle.append(bool(int(wrow[1])))
 
 
-        # read in neighbors
+        # get ready to read the neighbors file
+        # if no neighbor file is given, then look for the neighbor file with corresponding name
+        # e.g. if the crystal file is crystals/greg.csv, look for crysNeighbs/greg_neighbs.csv
         if neighbFile == None:
-            i = self.crystalFile.find('/') # chop off any part of the name before a slash
+            # chop off any part of the name before the first slash
+            # (bc crystalFile usually starts with "crystals/")
+            i = self.crystalFile.find('/') 
             nameRoot = self.crystalFile[i+1:-4]
             neighbFile = "crysNeighbs/"+nameRoot+"_neighbs.csv"
         else:
             neighbFile = "crysNeighbs/"+neighbFile
 
+        # time to read the neighbors in!
         with open(neighbFile) as csvFile:
             reader = csv.reader(csvFile, delimiter=',')
             for row in reader:
    
-                # first element gives the particles whomst neighbors we will see
+                # column 0 gives the particles whomst neighbors we will see
                 partID = int(row[0])
                 
                 # subsequent elements are that particle's neighbors
@@ -122,42 +148,87 @@ class Polycrystal:
                 # this will allow us to sort the neighbors in ccw order, which is convenient in freeSpace
                 sortKey = self.make_clockwiseangle_and_distance_byID(partID)
                 self.neighbs[partID] = sorted(myNeighbs,key=sortKey)
-                
-    
-    def foo(self):
-        for i in range(len(self.particleCenters)):
-            for j in range(i+1,len(self.particleCenters)):
-                myR = dist(self.particleCenters[i],self.particleCenters[j])/2
-                if myR <= 11:
-                    print(i+1,j+1,myR)
 
+    # ===================================================================================================            
+    # ======================================== DISPLAY FUNCTIONS ========================================
+    # ===================================================================================================   
 
+    # display the polycrystal
     def show(self):
+        self.showHighlight([])
+
+    # display the polycrystal and highlight some particles (specified by pIDs) in red
+    def showHighlight(self,pIDs):
+
         fig, ax = plt.subplots()
         ax.set_aspect(1)
 
         for i in range(len(self.particleCenters)):
             p = self.particleCenters[i]
-            circ = plt.Circle(p, self.beadRad, facecolor='gray',edgecolor=None, alpha=0.3)
+
+            if i+1 in pIDs:
+                myFaceColor = '#5c0000'
+            else:
+                myFaceColor = 'gray'
+
+            # draw the particle
+            circ = plt.Circle(p, self.beadRad, facecolor=myFaceColor,edgecolor=None, alpha=0.5)
             ax.add_artist(circ)
     
+            # if this particle is in the window, add a small dot on its center
             if self.countParticle[i]:
                 circ = plt.Circle(p, self.beadRad/5, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
-            
-            #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
+                # sometimes it's also nice to display pIDs
+                #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
 
-        plt.xlim(self.windowDims[0]-2*self.beadRad,self.windowDims[1]+2*self.beadRad)
-        plt.ylim(self.windowDims[2]-2*self.beadRad,self.windowDims[3]+2*self.beadRad)
+        plt.xlim(self.displayWindow[0]-2*self.beadRad,self.displayWindow[1]+2*self.beadRad)
+        plt.ylim(self.displayWindow[2]-2*self.beadRad,self.displayWindow[3]+2*self.beadRad)
 
         plt.show()
+        # you can also automatically save the image if you want
         #strPos = self.crystalFile.rfind('/') # chop off any part of the name before a slash
         #nameRoot = self.crystalFile[strPos+1:-4]
         #fig.savefig(nameRoot+"_img.png",dpi=900)
         plt.close(fig)
-        
 
+    # a silly function to display grainsplitting sims, just to help figure-making
+    # idk you can like, delete this function
+    def showGrainSplitSim(self,R_grain,isInitialFrame):
+        x_max = 2*R_grain+200
 
+        fig, ax = plt.subplots()
+        ax.set_aspect(1)
+
+        for i in range(len(self.particleCenters)):
+            p = self.particleCenters[i]
+
+            if self.countParticle[i] and isInitialFrame:
+                myFill = True
+                myOrder = 5
+                faceColor = '#FFFFFF'
+                edgeColor = '#000000'
+            elif p[0] <= x_max/2: #or i==993 or i==954 or i==995 or i==919:
+                myFill = True
+                myOrder = 0
+                faceColor = '#bababa'
+                edgeColor = '#bababa'
+            else:
+                myFill = True
+                myOrder = 0
+                faceColor = '#636363'
+                edgeColor = '#636363'
+
+            circ = plt.Circle(p, self.beadRad, facecolor=faceColor,edgecolor=edgeColor, alpha=1,fill=myFill,zorder=myOrder)
+            ax.add_artist(circ)
+
+        plt.xlim(self.displayWindow[0]-4*self.beadRad,self.displayWindow[1]+4*self.beadRad)
+        plt.ylim(self.displayWindow[2]-4*self.beadRad,self.displayWindow[3]+4*self.beadRad)
+        plt.show()
+        plt.close(fig)
+
+    # display a zoomed-in picture of a particle with red circles of radius 2R
+    # around its neighbors. very useful for diagnosing issues with freeSpace
     def showNeighbors(self,pID):
 
         fig, ax = plt.subplots()
@@ -197,9 +268,48 @@ class Polycrystal:
         plt.show()
         plt.close(fig)
 
+    # display the free space of the particle specified by particleID
+    def showFreeSpace(self,particleID):
+        p = self.particleCenters[particleID-1]
+        (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(particleID)
+
+        fig, ax = plt.subplots()
+        ax.set_aspect(1)
+
+        circ = plt.Circle(p, self.beadRad/60, color='black')
+        ax.add_artist(circ)
+
+        nnIDs = self.neighbs[particleID]
+        nns = [self.particleCenters[nnID-1] for nnID in nnIDs]
+        for i in range(len(nns)):
+            circ = plt.Circle(nns[i], self.beadRad/60, color='black')
+            ax.add_artist(circ)
+            plt.text(nns[i][0]+self.beadRad/15,nns[i][1]+self.beadRad/15,str(nnIDs[i]))
+            circ = plt.Circle(nns[i], 2*self.beadRad, color='gray', alpha=0.3)
+            ax.add_artist(circ)
+
+        plt.plot(freeSpaceCurveX,freeSpaceCurveY,'r')
+        plt.xlim(min(freeSpaceCurveX)-self.beadRad/3,max(freeSpaceCurveX)+self.beadRad/3)
+        plt.ylim(min(freeSpaceCurveY)-self.beadRad/3,max(freeSpaceCurveY)+self.beadRad/3)
+        plt.show()
+        plt.close(fig)
+        return freeArea
+
+    # ===================================================================================================            
+    # =========================================== FREE SPACE ============================================
+    # ===================================================================================================   
     
-    # returns the area and shape of the particle specified by particleID
+    # find the shape & area of free space associated with the particle specified by particleID
+    # returns a list containing: 0. particleID (returning this makes it possible to parallelize entropy, 
+    #                               which i don't do anymore lol)
+    #                            1. area of the free space (normalized)
+    #                            2. array of x-values specifying the shape of the free space
+    #                            3. array of y-values specifying the shape of the free space
+    # optional input imgMaking: if True, i will automatically save an image of this particle's free
+    #                             space if/when something weird happens. the image will be saved
+    #                             to badFreeSpace/path/to/crystal/crystalFileName_freespace_pID.png
     def freeSpace(self,particleID,imgMaking=False):
+        # a bool to keep track of whether anything weird has happened
         thisWentSmoothly = True
 
         # return 0 for particles that shouldn't be counted
@@ -210,14 +320,17 @@ class Polycrystal:
         nnIDs = self.neighbs[particleID]
         nns = [self.particleCenters[nnID-1] for nnID in nnIDs]
 
+        # set up lists to keep track of crossing points:
         # (x,y) for crossing points between neighbors' excl area circles
         crossingPts = [] 
         # (circle1,circle2) specifying, for each entry in crossingPts, which neighbors' circles are crossing
+        # stored as the neighbor's index in the list nnIDs
         crossingPairs = [] 
 
-        # go over all pairs of circles
+        # go over all pairs of neighbors
         for i in range(len(nns)):
             for j in range(i+1,len(nns)): 
+                # find crossing points
                 myCrossingPts = myGeo.circIntersections(nns[i][0], nns[i][1], 2*self.beadRad, \
                                                         nns[j][0], nns[j][1], 2*self.beadRad)
                 
@@ -225,7 +338,7 @@ class Polycrystal:
                 if myCrossingPts == None:
                     continue
                 
-                # keep only the CLOSEST crossing point
+                # keep only the closest crossing point
                 cross1 = (myCrossingPts[0],myCrossingPts[1])
                 cross2 = (myCrossingPts[2],myCrossingPts[3])
                 if dist(center,cross1) <= dist(center,cross2):
@@ -241,12 +354,14 @@ class Polycrystal:
                     if dist(nns[k],closestCrossingPt) < 2*self.beadRad:
                         keepMe = False
                         break
-
+                
+                # if you've made it this far, add to our list of crossing points
                 if keepMe:
                     crossingPts.append(closestCrossingPt)
                     crossingPairs.append( (i,j) )
         
-        # check for and correct nearest neighbor network issues
+        # check for nearest neighbor network issue #1: neighbors that have >2 crossing points
+        # fix it by keeping only the closest 2
         for i in range(len(nns)):
             # find the crossing points on this circle
             myPtInds = []
@@ -254,16 +369,15 @@ class Polycrystal:
                 if crossingPairs[j][0] == i or crossingPairs[j][1] == i:
                     myPtInds.append(j)
 
-            # there's an issue if there's >2 crossing points
+            # if there's <=2 crossing points, there's no issue
             if len(myPtInds) <= 2:
                 continue
             
             if thisWentSmoothly:
                 print(particleID,"has extraneous neighbors")
                 thisWentSmoothly = False
-            #print("============")
-            #print(nnIDs[i])
-            # find the two crossing points closest to the particle's center
+
+            # find the two crossing points closest to the central particle
             crossingPtInd1 = -1
             crossingPtInd2 = -1
             crossingPtDist1 = np.inf
@@ -283,14 +397,11 @@ class Polycrystal:
             myPtInds = sorted(myPtInds,reverse=True) # modifying a list, so work back to front
             for j in myPtInds:
                 if j != crossingPtInd1 and j != crossingPtInd2:
-                    #print(crossingPts[j])
-                    #print(nnIDs[crossingPairs[j][0]],nnIDs[crossingPairs[j][1]])
                     crossingPts = np.delete(crossingPts,j,0)
                     crossingPairs = np.delete(crossingPairs,j,0)
 
-        # check for stragglers
-        #print(crossingPairs)
-        #print(crossingPts)
+        # check for nearest neighbor network issue #2: neighbors that have only 1 crossing point
+        # fix it by deleting the straggler crossing point
         for i in range(len(nns)):
             # find the crossing points on this circle
             myPtInds = []
@@ -300,20 +411,17 @@ class Polycrystal:
 
             if len(myPtInds) == 1:
                 j = myPtInds[0]
-                #print("straggler:")
-                #print(crossingPts[j])
-                #print(nnIDs[crossingPairs[j][0]],nnIDs[crossingPairs[j][1]])
                 crossingPts = np.delete(crossingPts,j,0)
                 crossingPairs = np.delete(crossingPairs,j,0)
 
+        # oh no! something has gone horribly wrong. bail out
         if len(crossingPts) == 0:
             print("free area appears to be 0 or negative for "+str(particleID)+", go check it out")
             return [particleID,0,[center[0]],[center[1]]]
 
         # find the area of the polygon bounded by the crossing points
         # first, find a point (x_inside, y_inside) that is inside the polygon
-        x_inside = np.average([crossPt[0] for crossPt in crossingPts])
-        y_inside = np.average([crossPt[1] for crossPt in crossingPts])
+        [x_inside,y_inside] = myGeo.centroid([crossPt[0] for crossPt in crossingPts],[crossPt[1] for crossPt in crossingPts])
         # now define sortKey, a function that returns a point's angle and distance relative to (x_inside,y_inside)
         # this allows us to sort the crossing points in ccw order, which is a necessary pre-req for polyArea
         sortKey = myGeo.make_clockwiseangle_and_distance((x_inside,y_inside))
@@ -324,7 +432,7 @@ class Polycrystal:
         freeSpaceCurveX = []
         freeSpaceCurveY = []
 
-        # go through each excluded area circle and cut out the appropriate segment
+        # iterate over the excluded area circles and cut out the appropriate segment for each
         for i in range(len(nns)):
 
             # find the crossing points on this circle
@@ -336,7 +444,7 @@ class Polycrystal:
             # i expect to always find 0 or 2 crossing points
             if len(myPts) == 0: 
                 continue
-            if len(myPts) != 2 or len(myPts) == 1:
+            if len(myPts) != 2:
                 print(particleID,"somehow still has an issue, come fix it")
                 thisWentSmoothly = False
 
@@ -348,7 +456,7 @@ class Polycrystal:
             theta1 = np.arctan2(vec1[1],vec1[0])
             theta2 = np.arctan2(vec2[1],vec2[0])
 
-            # arctan2's range is [-pi,pi], meaning there's an awkward jump at pi
+            # arctan2's range is [-pi,pi], meaning there's an awkward jump at pi.
             # adjust theta1, theta2 so that they do not straddle the jump
             # i jump through all these hoops so that later on, you can plot a 
             # pretty, continuous range of thetas between theta1 and theta2
@@ -364,7 +472,7 @@ class Polycrystal:
 
             # positive angle between vec1 and vec2
             theta = abs(theta1-theta2)
-            # segment area = (1/2) * (theta-sin(theta)) * R^2
+            # segment area = (1/2) * (theta-sin(theta)) * (2R)^2
             segArea = 0.5 * (theta-np.sin(theta)) * 4*self.beadRad*self.beadRad
             myArea = myArea - segArea
 
@@ -377,10 +485,12 @@ class Polycrystal:
             freeSpaceCurveY.extend([nns[i][1]+2*self.beadRad*np.sin(t) for t in np.linspace(thetaMin,thetaMax,numSteps)])
 
         freeArea = myArea/(np.pi*self.beadRad*self.beadRad)
+
         if freeArea > 0.5:
-            print(particleID,"has rather large free area, worth checking out")
+            print(particleID,"has weirdly large free area, worth checking out")
             thisWentSmoothly = False
 
+        # if anything fishy happened and imgMaking is on, make & save a picture of the free space
         if not(thisWentSmoothly) and imgMaking:
             fig, ax = plt.subplots()
             ax.set_aspect(1)
@@ -396,126 +506,125 @@ class Polycrystal:
                 circ = plt.Circle(nns[i], 2*self.beadRad, color='gray', alpha=0.3)
                 ax.add_artist(circ)
 
-            plt.plot(freeSpaceCurveX,freeSpaceCurveY)
+            plt.plot(freeSpaceCurveX,freeSpaceCurveY,'r')
             plt.xlim(min(freeSpaceCurveX)-self.beadRad/3,max(freeSpaceCurveX)+self.beadRad/3)
             plt.ylim(min(freeSpaceCurveY)-self.beadRad/3,max(freeSpaceCurveY)+self.beadRad/3)
 
-            strPos = self.crystalFile.find('/') # chop off any part of the name before a slash
+            # generate a name for the image file
+            # chop off the "crystals/" prefix from the crystal file name
+            strPos = self.crystalFile.find('/') 
             nameRoot = self.crystalFile[strPos+1:-4]
             myFileName = "badFreeSpace/"+nameRoot+"_freespace_"+str(particleID)+".png"
             try:
                 fig.savefig(myFileName, dpi=900)
+            # if the folder doesn't exist yet, make it
             except FileNotFoundError:
                 strPos = nameRoot.rfind('/')
                 os.makedirs("badFreeSpace/"+nameRoot[0:strPos])
                 fig.savefig(myFileName, dpi=900)
             plt.close(fig)
 
+        # collapse onto the finish line of this behemoth function
         return [particleID,myArea/(np.pi*self.beadRad*self.beadRad),freeSpaceCurveX,freeSpaceCurveY]
 
 
-    def drawFreeSpace(self,particleID,show=True,save=False):
-        p = self.particleCenters[particleID-1]
-        (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(particleID)
+    # ===================================================================================================            
+    # ============================================= ENTROPY =============================================
+    # ===================================================================================================   
 
-        fig, ax = plt.subplots()
-        ax.set_aspect(1)
-
-        circ = plt.Circle(p, self.beadRad/60, color='black')
-        ax.add_artist(circ)
-
-        nnIDs = self.neighbs[particleID]
-        nns = [self.particleCenters[nnID-1] for nnID in nnIDs]
-        for i in range(len(nns)):
-            circ = plt.Circle(nns[i], self.beadRad/60, color='black')
-            ax.add_artist(circ)
-            plt.text(nns[i][0]+self.beadRad/15,nns[i][1]+self.beadRad/15,str(nnIDs[i]))
-            circ = plt.Circle(nns[i], 2*self.beadRad, color='gray', alpha=0.3)
-            ax.add_artist(circ)
-
-        plt.plot(freeSpaceCurveX,freeSpaceCurveY)
-        plt.xlim(min(freeSpaceCurveX)-self.beadRad/3,max(freeSpaceCurveX)+self.beadRad/3)
-        plt.ylim(min(freeSpaceCurveY)-self.beadRad/3,max(freeSpaceCurveY)+self.beadRad/3)
-        plt.show()
-        plt.close(fig)
-        return freeArea
-
-    
-    def entropy(self,sbeadFile=None,imgFile=None):
-        tic = time.time()
-        fig, ax = plt.subplots()
-        ax.set_aspect(1)
-        plt.xlim(self.windowDims[0]-2*self.beadRad,self.windowDims[1]+2*self.beadRad)
-        plt.ylim(self.windowDims[2]-2*self.beadRad,self.windowDims[3]+2*self.beadRad)
-
-        # generate an Sbead file name, if none provided
+    # find the dimensionless entropy S = \sum_i \ln\frac{v_i}{\pi R^2}
+    # returns S, and creates 2 files:
+    # (1) a csv where each row is [particle ID, free space]. by default saved to freeSpaceCSVs/crystalFileName_freeSpaces.csv
+    # (2) an image showing each particle's free space. by default saved to snowflakes/crystalFileName_snowflakes.png
+    # optional inputs freeSpaceFile and imgFile allow you to specify
+    # the names of these files rather than using the default
+    def entropy(self,freeSpaceFile=None,imgFile=None):
+        # generate file names, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
         nameRoot = self.crystalFile[i+1:-4]
-        if sbeadFile == None:
-            sbeadFile = 'freeSpaceCSVs/'+nameRoot+'_freeSpaces.csv'
+        if freeSpaceFile == None:
+            freeSpaceFile = 'freeSpaceCSVs/'+nameRoot+'_freeSpaces.csv'
         if imgFile == None:
             imgFile = 'snowflakes/'+nameRoot+'_snowflakes.png'
+
+        # setting up the image
+        fig, ax = plt.subplots()
+        #ax.set_facecolor([0.25,0.25,0.25])
         cmap = cm.get_cmap('viridis')
+        plt.xlim(self.displayWindow[0]-self.beadRad,self.displayWindow[1]+self.beadRad)
+        plt.ylim(self.displayWindow[2]-self.beadRad,self.displayWindow[3]+self.beadRad)
+        ax.set_aspect(1) # this makes it square
+        plt.tick_params(axis='x',which='both',bottom=False,top=False,labelbottom=False) # turn off the ticks
+        plt.tick_params(axis='y',which='both',left=False,right=False,labelleft=False) # turn off the ticks
 
         S = 0 # total S
-        numParts = 0 # number of particles counted
-        buffer = self.beadRad*2
 
-        with open(sbeadFile,'w',newline='') as sbeadFileObj:
-            writer = csv.writer(sbeadFileObj)
+        with open(freeSpaceFile,'w',newline='') as freeSpaceFileObj:
+            writer = csv.writer(freeSpaceFileObj)
 
+            # iterate over the particles
             for i in range(len(self.particleCenters)):
                 p = self.particleCenters[i]
 
-                # draw
-                circ = plt.Circle(p, self.beadRad, facecolor='#b8b8b8',edgecolor='black',linewidth=0,alpha=1,zorder=0)
+                # draw this particle
+                circ = plt.Circle(p, self.beadRad, facecolor=[0.6,0.6,0.6],edgecolor='black',linewidth=0,alpha=1,zorder=0)
+                #circ = plt.Circle(p, self.beadRad, facecolor='#b8b8b8',edgecolor='black',linewidth=0,alpha=1,zorder=0)
                 ax.add_artist(circ)
 
-                # don't count particles that are outside the window
+                # if this particle shouldn't be counted, then stop now
                 if not self.countParticle[i]:
                     continue
-                numParts += 1
 
                 # draw a black dot to indicate this particle is included
-                circ = plt.Circle(p, self.beadRad/30, facecolor='k', edgecolor=None,zorder=10)
+                circ = plt.Circle(p, self.beadRad/15, facecolor='k', edgecolor=None,zorder=10)
                 ax.add_artist(circ) 
 
                 # find the free area -- note that particleID = i+1 !!
                 (pID,freeArea,freeSpaceCurveX,freeSpaceCurveY) = self.freeSpace(i+1,imgMaking=True)
 
                 if freeArea <= 0:
+                    # if freeArea<=0, something went very wrong!
+                    # this keeps it from crashing, but you should really
+                    # go back and fix the issue
                     Si = 0
                 else:
                     Si = np.log(freeArea)
-
                 S += Si
 
-                writer.writerow([pID,freeArea]) # record in Sbead file
+                # write down this particle's free area
+                writer.writerow([pID,freeArea])
 
-                # draw free area
+                # draw this particle's free area
+
                 # cmap takes a number in [0,1) to a color
                 rgb = cmap((freeArea)*25)[0:3]
+                #rgb = cmap((freeArea-0.035)*6.9)[0:3]
                 #ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=rgb,edgecolor='black',lw=0.15)
+                #ax.fill(freeSpaceCurveX,freeSpaceCurveY, facecolor=[0.8,0.8,0.8],edgecolor='black',lw=0.15)
 
-                # to plot free space at 3x its size, use this code instead
-                cen = centroid(freeSpaceCurveX,freeSpaceCurveY)
+                # use this code to plot free space at 2x its size
+                cen = myGeo.centroid(freeSpaceCurveX,freeSpaceCurveY)
                 biggerCurveX = 2*(np.array(freeSpaceCurveX)-cen[0])+cen[0]
                 biggerCurveY = 2*(np.array(freeSpaceCurveY)-cen[1])+cen[1]
                 ax.fill(biggerCurveX,biggerCurveY, facecolor=rgb,edgecolor='black',lw=0.15,zorder=5)
         
 
-        fig.savefig(imgFile, dpi=900)
+        fig.savefig(imgFile, dpi=900)#, transparent=True)
         plt.close(fig)
-        toc = time.time()
-        return [S,numParts,toc-tic]
+        return S
 
+    # an attempt to find entropy by using a monte carlo method to 
+    # directly measure \Omega, the volume of accessible, allowed configurations
+    # i never got \Omega to be nonzero tho. i think you'd need to run a lot of trials.
     def entropyMC(self,numTrials):
         successfulTrials = 0
         for i in range(numTrials):
             successfulTrials += self.MCtrial()
         return successfulTrials/numTrials
 
+    # run one trial for entropyMC
     def MCtrial(self):
+        # randomly displace each particle, put the new positions in trialCenters
         trialCenters = []
         for i in range(len(self.particleCenters)):
             p = self.particleCenters[i]
@@ -526,62 +635,72 @@ class Polycrystal:
             
             trialCenters.append( (p[0]+x0, p[1]+y0) )
         
+        # look for overlap between the new particle positions
         for pID in range(1,len(trialCenters)+1):
+            # look for overlap only with nearest neighbors
             myNeighbs = self.neighbs[pID]
             for nnID in myNeighbs:
+                # if there are overlapping particles, don't count this trial
                 if dist(trialCenters[pID-1],trialCenters[nnID-1]) < self.beadRad*2:
                     return 0
         
+        # no overlapping particles! count this trial!
         return 1
 
+    # find the dimensionless entropy S by computing all particles' free areas in parallel
+    # *** WARNING this function is outdated, i haven't used it in 
+    #     a long time and i don't even know if it would run anymore. ***
+    # returns S and creates a csv where each row is [particle ID, free space],
+    # by default saved to freeSpaceCSVs/crystalFileName_freeSpaces.csv
+    # optional input freeSpaceFile allows you to specify the name of this file rather than using the default
+    # input numProc specifies the number of processes for the parallel stuff
+    def entropyParallel(self,numProc,freeSpaceFile=None):
 
-    def entropyParallel(self,numProc,sbeadFile=None):
-        tic = time.time()
-
-        # generate an Sbead file name, if none provided
+        # generate free space file name, if none provided
         i = self.crystalFile.rfind('/') # chop off any part of the name before a slash
         nameRoot = self.crystalFile[i+1:-4]
-            
-        if sbeadFile == None:
-            sbeadFile = nameRoot+'_Sbead.csv'
+        if freeSpaceFile == None:
+            freeSpaceFile = 'freeSpaceCSVs/'+nameRoot+'_freeSpaces.csv'
 
         S = 0 # total S
 
         # pick out the particles to include in entropy calculation
         particlesInGrid = []
-        buffer = self.beadRad*2
         for i in range(len(self.particleCenters)):
-            p = self.particleCenters[i]
-
             # don't count particles that are outside the window
             if self.countParticle[i]:
                 particlesInGrid.append(i+1)
 
-        numParts = len(particlesInGrid)
-
-        with open(sbeadFile,'w',newline='') as sbeadFileObj:
-            writer = csv.writer(sbeadFileObj)
+        with open(freeSpaceFile,'w',newline='') as freeSpaceFileObj:
+            writer = csv.writer(freeSpaceFileObj)
 
             # get all snowflakes in parallel
-            pool = mp.Pool(numProc)  
-            pool_results = [pool.apply_async(self.freeSpace,args=[pID]) for pID in particlesInGrid]
+            pool = mp.Pool(numProc) 
 
+            # apply_async does not necessarily return results in the order you gave the inputs
+            # that's why i made entropy return particleID, so that you can still tell
+            # which particle goes with which free area
+            pool_results = [pool.apply_async(self.freeSpace,args=[pID]) for pID in particlesInGrid]
             pool.close()
             pool.join()
 
             for r in pool_results:
-                [pID,freeArea] = r.get()
+                [pID,freeArea,freeSpaceX,freeSpaceY] = r.get()
                 Si = np.log(freeArea)
                 S += Si
                 writer.writerow([pID,Si])
 
-        toc = time.time()
+        return S
 
-        return [S,numParts,toc-tic]
+    # ===================================================================================================            
+    # ============================================== MISC ===============================================
+    # ===================================================================================================  
 
+    # returns the approximate volume fraction within the window
+    # assumes area occupied = N pi r^2
+    # this isn't accounting for particles that fall partially outside the window
+    # i wrote a function that does that, but it's in matlab RIP
     def areaFraction(self):  
-        # area occupied = N pi r^2
-        # TODO this isn't accounting for particles that fall partially outside the window
         windowPath = path.Path(self.windowVertices)
         inWindow = windowPath.contains_points(self.particleCenters)
         numParts = sum(inWindow)
@@ -589,6 +708,24 @@ class Polycrystal:
         totalArea = myGeo.polyArea(self.windowVertices)
         return areaOccupied/totalArea
     
+    # returns the smallest distance between any two particles in the whole polycrystal
+    def minDist(self):
+        minD = self.beadRad*10 # dummy value to start
+        minPair = (-1,-1)
+        for i in range(len(self.particleCenters)):
+            pID = i+1
+            nnIDs = self.neighbs[pID]
+            for nnID in nnIDs:
+                myD = dist(self.particleCenters[pID-1],self.particleCenters[nnID-1])
+                if myD <= minD:
+                    minD = myD
+                    minPair = (pID,nnID)
+        return (minD,minPair)
+
+    # returns the number of particles that get counted when computing entropy
+    def numParts(self):
+        return sum(self.countParticle)
+
     # im so sorry this god-awful function exists twice in my code base
     # it's once here and there's also an extremely similar function in myGeo
     # the myGeo one is older and doesn't really need to exist if this one's here
@@ -625,8 +762,3 @@ def dist(p1,p2):
     (x2,y2) = p2
     return np.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2))
 
-def centroid(x_coords,y_coords):
-    _len = len(x_coords)
-    centroid_x = sum(x_coords)/_len
-    centroid_y = sum(y_coords)/_len
-    return [centroid_x, centroid_y]
