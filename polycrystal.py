@@ -13,12 +13,12 @@ import random
 ####   welcome to the polycrystal class!
 ####   the primary purpose of this class is to find the entropy associated with a polycrystal
 ####   by finding the free space available to each particle.
-####   more details on how to use this class can be found in the README that i'm totally gonna write.
+####   more details on how to use this class can be found on the gerbode lab website.
 ####   anna barth 2021
 
 class Polycrystal:
     # class fields:
-    #   crystalFile: the name of the csv containing a list of particle positions.
+    #   crystalFile: the name of the csv containing a list of particle positions
     #   beadRad: the particle radius
     #   particleCenters: a list of particle positions, stored as tuples,
     #        indexed by particle ID-1 (i.e. particle 1's position is particleCenters[0]).
@@ -44,7 +44,7 @@ class Polycrystal:
 
     # input fname: the crystal csv file name
     # optional input neighbFile: the nearest neighbor file name
-    #      (if not given, i will assume it's in the conventional spot)
+    #      (if not given, i will assume it's at crysNeighbs/crystalFileName_neighbs.csv)
     # optinal input windowOverride: see description above
     # optinal input radius: if provided, i'll use this instead of the value in the crystal csv
     def __init__(self,fname,neighbFile=None,windowOverride=False,radius=0):
@@ -153,10 +153,7 @@ class Polycrystal:
                 sortMe = np.array([sortKey(self.particleCenters[nnID-1]) for nnID in myNeighbs],dtype="f,f")
                 sortedIndices = np.argsort(sortMe)
                 self.neighbs[partID] = [myNeighbs[i] for i in sortedIndices]
-
-
-                    
-                    
+           
 
     # ===================================================================================================            
     # ======================================== DISPLAY FUNCTIONS ========================================
@@ -189,7 +186,7 @@ class Polycrystal:
                 circ = plt.Circle(p, self.beadRad/5, facecolor='k', edgecolor=None)
                 ax.add_artist(circ)
                 # sometimes it's also nice to display pIDs
-                plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
+                #plt.text(p[0]+self.beadRad/15,p[1]+self.beadRad/15,str(i+1))
 
         plt.xlim(self.displayWindow[0]-2*self.beadRad,self.displayWindow[1]+2*self.beadRad)
         plt.ylim(self.displayWindow[2]-2*self.beadRad,self.displayWindow[3]+2*self.beadRad)
@@ -216,7 +213,7 @@ class Polycrystal:
                 myFill = True
                 myOrder = 5
                 faceColor = '#FFFFFF'
-                edgeColor = '#000000'
+                edgeColor = '#6b6b6b'
             elif p[0] <= x_max/2: #or i==993 or i==954 or i==995 or i==919:
                 myFill = True
                 myOrder = 0
@@ -544,7 +541,7 @@ class Polycrystal:
     # find the dimensionless entropy S = \sum_i \ln\frac{v_i}{\pi R^2}
     # returns S, and creates 2 files:
     # (1) a csv where each row is [particle ID, free space]. by default saved to freeSpaceCSVs/crystalFileName_freeSpaces.csv
-    # (2) an image showing each particle's free space. by default saved to snowflakes/crystalFileName_snowflakes.png
+    # (2) an image showing each particle's free space. by default saved to freeSpaceDiagrams/crystalFileName_snowflakes.png
     # optional inputs freeSpaceFile and imgFile allow you to specify
     # the names of these files rather than using the default
     def entropy(self,freeSpaceFile=None,imgFile=None):
@@ -554,7 +551,7 @@ class Polycrystal:
         if freeSpaceFile == None:
             freeSpaceFile = 'freeSpaceCSVs/'+nameRoot+'_freeSpaces.csv'
         if imgFile == None:
-            imgFile = 'snowflakes/'+nameRoot+'_snowflakes.png'
+            imgFile = 'freeSpaceDiagrams/'+nameRoot+'_snowflakes.png'
 
         # setting up the image
         fig, ax = plt.subplots()
@@ -657,8 +654,7 @@ class Polycrystal:
         return 1
 
     # find the dimensionless entropy S by computing all particles' free areas in parallel
-    # *** WARNING this function is outdated, i haven't used it in 
-    #     a long time and i don't even know if it would run anymore. ***
+    # this function is outdated, i haven't used it in a long time and i don't even know if it would work anymore...
     # returns S and creates a csv where each row is [particle ID, free space],
     # by default saved to freeSpaceCSVs/crystalFileName_freeSpaces.csv
     # optional input freeSpaceFile allows you to specify the name of this file rather than using the default

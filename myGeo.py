@@ -1,6 +1,9 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
+###    myGeo is where i keep the useful geometry functions i pillage from stackoverflow
+
+# function which takes an origin point and returns {a function that gives a point's angle and distance from the origin}
+# this is useful for sorting points in CW or CCW order
 # stackoverflow.com/questions/41855695/sorting-list-of-two-dimensional-coordinates-by-clockwise-angle-using-python
 def make_clockwiseangle_and_distance(origin):
     def clockwiseangle_and_distance(point):
@@ -26,7 +29,7 @@ def make_clockwiseangle_and_distance(origin):
         return angle, lenvector
     return clockwiseangle_and_distance
 
-# shoelace formula
+# shoelace formula for calculating the area of a polygon
 # stackoverflow.com/questions/24467972/calculate-area-of-polygon-given-x-y-coordinates
 def polyArea(corners):
     n = len(corners) # of corners
@@ -38,6 +41,8 @@ def polyArea(corners):
     area = abs(area) / 2.0
     return area
 
+# find the crossing points of two circles
+# one circle of radius r0 at (x0,y0) and another of radius r1 at (x1,y1)
 # stackoverflow.com/questions/55816902/finding-the-intersection-of-two-circles
 # if no crossing points, returns None
 # if 2 crossing points, returns both in the form (x1,y1,x2,y2)
@@ -69,3 +74,10 @@ def circIntersections(x0, y0, r0, x1, y1, r1):
         y4=y2+h*(x1-x0)/d
         
         return (x3, y3, x4, y4)
+
+# finds the centroid of a set of points
+def centroid(x_coords,y_coords):
+    _len = len(x_coords)
+    centroid_x = sum(x_coords)/_len
+    centroid_y = sum(y_coords)/_len
+    return [centroid_x, centroid_y]
