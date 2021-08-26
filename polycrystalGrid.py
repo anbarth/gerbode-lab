@@ -14,6 +14,15 @@ import importlib
 from matplotlib import path
 importlib.reload(myGeo)
 
+####   polycrystalgrid is the polycrystal class's dark past...
+####   it's like polycrystal, except all positions exist on a grid.
+####   and so then you calculate free area by literally counting up pixels
+####   like some kind of caveman.
+####   the comments are incomplete and i'm not gonna fix them because you should just 
+####   use polycrystal anyway. this class isnt useful for anything
+####   and i am including it more for the memories than anything else. 
+####   anna barth 2021
+
 class PolycrystalGrid:
     # class fields:
     #   xmin: minimum x value
